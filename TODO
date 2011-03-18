@@ -1,0 +1,22 @@
+GoSwat Checklist (-*- text -*-)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- evaluate the exp/ogle package
+  - how far along is it?
+  - how much can be reused?
+  - see how it uses debug/elf and debug/drawf
+- evaluate the debug packages (drawf, elf, etc) for re-use
+- what support for ELF is available in Go?
+  - see src/pkg/debug/elf
+- learn about DWARF (http://www.dwarfstd.org/)
+  - is there any Go package for reading DWARF?
+    - see src/pkg/debug/drawf
+  - if not, check out libdwarf (http://sourceforge.net/apps/trac/elftoolchain/wiki/libdwarf)
+- evaluate Picol as an alternative to gotcl (http://antirez.com/page/picol.html)
+  - looks good; easy to understand; clean C code
+  - needs to be translated to idiomatic Go code
+  - less code to start with, so more work/fun to develop
+- evaluate gotcl (http://code.google.com/p/gotcl/)
+  - so called "tcl-like" language, probably not a good base for starting
+  - not a full fledged Tcl interpreter
+  - has most of the basics
