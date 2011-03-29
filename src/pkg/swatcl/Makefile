@@ -9,6 +9,7 @@ include $(GOROOT)/src/Make.inc
 TARG=swatcl
 GOFILES=\
 	defs.go\
+	interpreter.go\
 	parser.go\
 
 include $(GOROOT)/src/Make.pkg

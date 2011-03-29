@@ -15,9 +15,18 @@ func NewParser(text string) *Parser {
 	return p
 }
 
+// GetTokenText returns the text of the current token.
+func (p *Parser) GetTokenText() string {
+	tlen := p.end - p.start + 1
+	if tlen < 0 {
+		tlen = 0
+	}
+	return p.text[p.start:p.start + tlen]
+}
+
 // parseSep expects the current position to be the start of a separator
 // and advances until it finds the end of that separator.
-func (p *Parser) parseSep() parserState {
+func (p *Parser) parseSep() (parserState, *TclError) {
 	p.start = p.p
 	for p.len > 0 && (p.text[p.p] == ' ' || p.text[p.p] == '\t' ||
 		p.text[p.p] == '\n' || p.text[p.p] == '\r') {
@@ -26,13 +35,13 @@ func (p *Parser) parseSep() parserState {
 	}
 	p.end = p.p - 1
 	p.token = tokenSeparator
-	return stateOK
+	return stateOK, nil
 }
 
 // parseEol expects the current position to be near the end of the line
 // and advances until it finds the actual end of the line, passing over
 // all whitespace and semicolons.
-func (p *Parser) parseEol() parserState {
+func (p *Parser) parseEol() (parserState, *TclError) {
 	p.start = p.p
 	for p.len > 0 && (p.text[p.p] == ' ' || p.text[p.p] == '\t' ||
 		p.text[p.p] == '\n' || p.text[p.p] == '\r' || p.text[p.p] == ';') {
@@ -41,23 +50,23 @@ func (p *Parser) parseEol() parserState {
 	}
 	p.end = p.p - 1
 	p.token = tokenEOL
-	return stateOK
+	return stateOK, nil
 }
 
 // parseComment expects the current position to be the start of a
 // comment and advances until it finds the end of the line.
-func (p *Parser) parseComment() parserState {
+func (p *Parser) parseComment() (parserState, *TclError) {
 	for p.len > 0 && p.text[p.p] != '\n' && p.text[p.p] != '\r' {
 		p.p++
 		p.len--
 	}
-	return stateOK
+	return stateOK, nil
 }
 
 // parseCommand expects the current position to be an open square
 // bracket ([) and advances to the end of the command (marked by a
 // closing square bracket (]).
-func (p *Parser) parseCommand() parserState {
+func (p *Parser) parseCommand() (parserState, *TclError) {
 	// skip over the initial open bracket ([)
 	level := 1
 	blevel := 0
@@ -92,40 +101,59 @@ func (p *Parser) parseCommand() parserState {
 		p.p++
 		p.len--
 	}
-	return stateOK
+	return stateOK, nil
 }
 
 // parseVariable expects the current position to be a dollar sign ($)
 // and advances to the end of the variable reference. If the dollar sign
 // is simply a bare character, it is treated as a string.
-func (p *Parser) parseVariable() parserState {
+func (p *Parser) parseVariable() (parserState, *TclError) {
 	// skip over the initial dollar sign ($)
 	p.p++
 	p.len--
 	p.start = p.p
-	// TODO: handle ${foo} formatted variable references
+	braced := false
+	if p.len > 0 && p.text[p.p] == '{' {
+		// The variable is of the form ${foo}
+		p.start++
+		p.p++
+		p.len--
+		braced = true
+	}
 	for p.len > 0 && ((p.text[p.p] >= 'a' && p.text[p.p] <= 'z') ||
 		(p.text[p.p] >= 'A' && p.text[p.p] <= 'Z') ||
 		(p.text[p.p] >= '0' && p.text[p.p] <= '9') || p.text[p.p] == '_') {
 		p.p++
 		p.len--
 	}
+	if braced {
+		// ensure there is a matching closing brace
+		if p.len > 0 && p.text[p.p] == '}' {
+			p.p++
+			p.len--
+		} else {
+			return stateError, NewTclError(EBRACE, "missing closing brace")
+		}
+	}
 	if p.start == p.p {
 		// It's just a single char string '$'
 		p.end = p.p - 1
 		p.start = p.end
 		p.token = tokenString
+	} else if braced {
+		p.end = p.p - 2
+		p.token = tokenVariable
 	} else {
 		p.end = p.p - 1
 		p.token = tokenVariable
 	}
-	return stateOK
+	return stateOK, nil
 }
 
 // parseBrace expects the current position to be an open curly brace ({)
 // and advances to the subsequent closing brace, including any enclosed
 // open and closing curly braces.
-func (p *Parser) parseBrace() parserState {
+func (p *Parser) parseBrace() (parserState, *TclError) {
 	// skip over the initial open bracket
 	level := 1
 	p.p++
@@ -145,7 +173,7 @@ func (p *Parser) parseBrace() parserState {
 					p.len--
 				}
 				p.token = tokenString;
-				return stateOK;
+				return stateOK, nil
 			}
 		} else if (p.text[p.p] == '{') {
 			level++
@@ -153,14 +181,14 @@ func (p *Parser) parseBrace() parserState {
 		p.p++
 		p.len--
 	}
-	return stateError // unreached
+	panic("reached unreachable code")
 }
 
 // parseString processes the text at the current location as if it were
 // (part of) a string, returning an appropriate state based on whether
 // the string is brace enclosed or double quoted and contains nested
 // substitutions.
-func (p *Parser) parseString() parserState {
+func (p *Parser) parseString() (parserState, *TclError) {
 	// determine the state of things
 	newword := p.token == tokenSeparator || p.token == tokenEOL || p.token == tokenString
 	if newword && p.text[p.p] == '{' {
@@ -177,7 +205,7 @@ func (p *Parser) parseString() parserState {
 		if p.len == 0 {
 			p.end = p.p - 1
 			p.token = tokenEscape
-			return stateOK
+			return stateOK, nil
 		}
 		switch p.text[p.p] {
 		case '\\':
@@ -189,12 +217,12 @@ func (p *Parser) parseString() parserState {
 		case '$', '[':
 			p.end = p.p - 1
 			p.token = tokenEscape
-			return stateOK
+			return stateOK, nil
 		case ' ', '\t', '\n', '\r', ';':
 			if !p.insidequote {
 				p.end = p.p - 1
 				p.token = tokenEscape
-				return stateOK
+				return stateOK, nil
 			}
 		case '"':
 			if p.insidequote {
@@ -203,20 +231,20 @@ func (p *Parser) parseString() parserState {
 				p.p++
 				p.len--
 				p.insidequote = false
-				return stateOK
+				return stateOK, nil
 			}
 		}
 		p.p++
 		p.len--
 	}
-	return stateError // unreached
+	panic("reached unreachable code")
 }
 
-// getToken evaluates the token at the current position and parses that
-// token appropriately, returning the state of the parser such that it
-// indicates the type of the token, the the start/end points of the
+// parseToken evaluates the token at the current position and parses
+// that token appropriately, returning the parser in a state such that
+// it indicates the type of the token, the the start/end points of the
 // token.
-func (p *Parser) getToken() parserState {
+func (p *Parser) parseToken() (parserState, *TclError) {
 	for {
 		if p.len == 0 {
 			if p.token != tokenEOL && p.token != tokenEOF {
@@ -224,7 +252,7 @@ func (p *Parser) getToken() parserState {
 			} else {
 				p.token = tokenEOF
 			}
-			return stateOK
+			return stateOK, nil
 		}
 		switch p.text[p.p] {
 		case ' ', '\t', '\r':
@@ -251,5 +279,5 @@ func (p *Parser) getToken() parserState {
 			return p.parseString()
 		}
 	}
-	return stateError // unreached
+	panic("reached unreachable code")
 }

@@ -4,14 +4,20 @@
 // license that can be found in the LICENSE file.
 //
 
+// The swatcl package implements a rudimentary Tcl interpreter for the
+// purpose of writing debugger commands.
 package swatcl
+
+import (
+	"os"
+)
 
 type parserState int
 const (
 	_ = iota
 	// evaluation successful
-	stateOK parserState = iota
-	// evaluation error
+	stateOK
+	// evaluation error, check returned error
 	stateError
 	// 'return' command status
 	stateReturn
@@ -25,7 +31,7 @@ type parserToken int
 const (
 	_ = iota
 	// escape token
-	tokenEscape parserToken = iota
+	tokenEscape
 	// string token
 	tokenString
 	// command token
@@ -40,6 +46,8 @@ const (
 	tokenEOF
 )
 
+// Parser represents the internal state of the Tcl parser, including the
+// text being parsed and the current token.
 type Parser struct {
 	// the text being parsed
 	text string
@@ -57,22 +65,54 @@ type Parser struct {
 	insidequote bool
 }
 
+// callFrame is a frame within the call stack of the Tcl interpreter.
 type callFrame struct {
 	vars map[string]string
 }
 
-type commandFunc func(context Interpreter) (int) //, int argc, char **argv, void *privdata);
+// commandFunc is a function that implements a built-in command.
+type commandFunc func(context *Interpreter, argv []string, data []byte) (parserState)
 
+// swatclCmd represents a built-in command.
 type swatclCmd struct {
-	name string
 	function commandFunc
 	privdata []byte
 }
 
+// Interpreter contains the internal state of the Tcl interpreter,
+// including register commands, the call frame, and result of the
+// interpretation.
 type Interpreter struct {
 	// Level of nesting
 	level int
 	frames []callFrame
-	commands []swatclCmd
+	commands map[string]swatclCmd
 	result string
+}
+
+// Error constants
+const (
+	_ = iota
+	EBRACE // EBRACE indicates an unmatched curly brace ({)
+	ECMDDEF // indicates command is already defined
+	EVARUNDEF // variable not defined
+	ECMDUNDEF // command not defined
+	ENOSTACK // no call frames on the stack
+)
+
+// TclError is used to provide information on the type of error that
+// occurred while parsing or evaluating the Tcl script.
+type TclError struct {
+	Errno os.Errno
+	Error os.Error
+}
+
+// NewTclError creates a new TclError based on the given values.
+func NewTclError(err int, msg string) *TclError {
+	return &TclError{os.Errno(err), os.ErrorString(msg)}
+}
+
+// String returns the string representation of the error.
+func (e *TclError) String() string {
+	return e.Error.String()
 }
