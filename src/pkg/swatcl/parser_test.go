@@ -14,10 +14,10 @@ import (
 type parserResult struct {
 	state parserState
 	token parserToken
-	len int
+	len   int
 	start int
-	end int
-	p int
+	end   int
+	p     int
 	quote bool
 }
 

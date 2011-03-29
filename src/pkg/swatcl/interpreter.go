@@ -38,7 +38,7 @@ func (i *Interpreter) GetVariable(name string) (string, *TclError) {
 		i.result = fmt.Sprintf("Empty call stack, cannot get '%s'", name)
 		return "", NewTclError(ENOSTACK, i.result)
 	}
-	frame := i.frames[last - 1]
+	frame := i.frames[last-1]
 	v, ok := frame.vars[name]
 	if !ok {
 		i.result = fmt.Sprintf("Variable '%s' undefined", name)
@@ -54,7 +54,7 @@ func (i *Interpreter) SetVariable(name, value string) *TclError {
 		i.result = fmt.Sprintf("Empty call stack, cannot set '%s'", name)
 		return NewTclError(ENOSTACK, i.result)
 	}
-	frame := i.frames[last - 1]
+	frame := i.frames[last-1]
 	frame.vars[name] = value
 	return nil
 }

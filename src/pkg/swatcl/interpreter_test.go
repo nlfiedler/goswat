@@ -13,10 +13,10 @@ import (
 
 // interpResult is the expected state of the interpreter.
 type interpResult struct {
-	level int
-	frames []callFrame
+	level    int
+	frames   []callFrame
 	commands map[string]swatclCmd
-	result string
+	result   string
 }
 
 // validateInterpreter checks that the interpreter is in exactly the
@@ -152,7 +152,7 @@ func TestInterpSetGetVariables(t *testing.T) {
 var testCmdCalled bool
 var testCmdArgs string
 
-func testCmd(context *Interpreter, argv []string, data []byte) (parserState) {
+func testCmd(context *Interpreter, argv []string, data []byte) parserState {
 	testCmdCalled = true
 	testCmdArgs = strings.Join(argv, ",")
 	return stateOK

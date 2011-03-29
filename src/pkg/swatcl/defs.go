@@ -13,6 +13,7 @@ import (
 )
 
 type parserState int
+
 const (
 	_ = iota
 	// evaluation successful
@@ -28,6 +29,7 @@ const (
 )
 
 type parserToken int
+
 const (
 	_ = iota
 	// escape token
@@ -71,7 +73,7 @@ type callFrame struct {
 }
 
 // commandFunc is a function that implements a built-in command.
-type commandFunc func(context *Interpreter, argv []string, data []byte) (parserState)
+type commandFunc func(context *Interpreter, argv []string, data []byte) parserState
 
 // swatclCmd represents a built-in command.
 type swatclCmd struct {
@@ -84,20 +86,20 @@ type swatclCmd struct {
 // interpretation.
 type Interpreter struct {
 	// Level of nesting
-	level int
-	frames []callFrame
+	level    int
+	frames   []callFrame
 	commands map[string]swatclCmd
-	result string
+	result   string
 }
 
 // Error constants
 const (
-	_ = iota
-	EBRACE // EBRACE indicates an unmatched curly brace ({)
-	ECMDDEF // indicates command is already defined
+	_         = iota
+	EBRACE    // EBRACE indicates an unmatched curly brace ({)
+	ECMDDEF   // indicates command is already defined
 	EVARUNDEF // variable not defined
 	ECMDUNDEF // command not defined
-	ENOSTACK // no call frames on the stack
+	ENOSTACK  // no call frames on the stack
 )
 
 // TclError is used to provide information on the type of error that

@@ -21,7 +21,7 @@ func (p *Parser) GetTokenText() string {
 	if tlen < 0 {
 		tlen = 0
 	}
-	return p.text[p.start:p.start + tlen]
+	return p.text[p.start : p.start+tlen]
 }
 
 // parseSep expects the current position to be the start of a separator
@@ -172,10 +172,10 @@ func (p *Parser) parseBrace() (parserState, *TclError) {
 					p.p++
 					p.len--
 				}
-				p.token = tokenString;
+				p.token = tokenString
 				return stateOK, nil
 			}
-		} else if (p.text[p.p] == '{') {
+		} else if p.text[p.p] == '{' {
 			level++
 		}
 		p.p++
