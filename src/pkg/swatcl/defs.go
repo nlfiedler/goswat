@@ -15,56 +15,37 @@ import (
 type parserState int
 
 const (
-	_ = iota
-	// evaluation successful
-	stateOK
-	// evaluation error, check returned error
-	stateError
-	// 'return' command status
-	stateReturn
-	// 'break' command status
-	stateBreak
-	// 'continue' command status
-	stateContinue
+	_             = iota
+	stateOK       // evaluation successful
+	stateError    // evaluation error, check returned error
+	stateReturn   // 'return' command status
+	stateBreak    // 'break' command status
+	stateContinue // 'continue' command status
 )
 
 type parserToken int
 
 const (
-	_ = iota
-	// escape token
-	tokenEscape
-	// string token
-	tokenString
-	// command token
-	tokenCommand
-	// variable token
-	tokenVariable
-	// separator token
-	tokenSeparator
-	// end-of-line token
-	tokenEOL
-	// end-of-file token
-	tokenEOF
+	_              = iota
+	tokenEscape    // escape token
+	tokenString    // string token
+	tokenCommand   // command token
+	tokenVariable  // variable token
+	tokenSeparator // separator token
+	tokenEOL       // end-of-line token
+	tokenEOF       // end-of-file token
 )
 
 // Parser represents the internal state of the Tcl parser, including the
 // text being parsed and the current token.
 type Parser struct {
-	// the text being parsed
-	text string
-	// current text position
-	p int
-	// remaining length to be parsd
-	len int
-	// start of current token
-	start int
-	// end of current token
-	end int
-	// token type (one of the token* constants)
-	token parserToken
-	// true if inside quotes
-	insidequote bool
+	text        string      // the text being parsed
+	p           int         // current text position
+	len         int         // remaining length to be parsd
+	start       int         // start of current token
+	end         int         // end of current token
+	token       parserToken // token type (one of the token* constants)
+	insidequote bool        // true if inside quotes
 }
 
 // callFrame is a frame within the call stack of the Tcl interpreter.
@@ -72,24 +53,27 @@ type callFrame struct {
 	vars map[string]string
 }
 
-// commandFunc is a function that implements a built-in command.
-type commandFunc func(context *Interpreter, argv []string, data []byte) parserState
+// commandFunc is a function that implements a built-in command. The
+// argv parameter provides the incoming arguments, with the first entry
+// being the name of the command being invoked. The data parameter is
+// that which was passed to the RegisterCommand method of Interpreter.
+// The function returns the parser state and the result of the command.
+type commandFunc func(i *Interpreter, argv []string, data []string) (parserState, string)
 
 // swatclCmd represents a built-in command.
 type swatclCmd struct {
-	function commandFunc
-	privdata []byte
+	function commandFunc // the command function
+	privdata []string    // private data given at time of registration
 }
 
 // Interpreter contains the internal state of the Tcl interpreter,
 // including register commands, the call frame, and result of the
 // interpretation.
 type Interpreter struct {
-	// Level of nesting
-	level    int
-	frames   []callFrame
-	commands map[string]swatclCmd
-	result   string
+	level    int                  // level of nesting
+	frames   []callFrame          // call stack frames
+	commands map[string]swatclCmd // registered commands
+	result   string               // result of evaluation
 }
 
 // Error constants
@@ -100,6 +84,8 @@ const (
 	EVARUNDEF // variable not defined
 	ECMDUNDEF // command not defined
 	ENOSTACK  // no call frames on the stack
+	EILLARG   // interpreter given illegal method arguments
+	EBADBOOL  // interpreter given a malformed boolean value
 )
 
 // TclError is used to provide information on the type of error that

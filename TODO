@@ -29,3 +29,11 @@ GoSwat Checklist (-*- text -*-)
   - not a full fledged Tcl interpreter
   - has most of the basics
 - Write a basic Tcl interpreter based on the picol example
+- Features
+  - Breakpoint tags vs. groups
+  - Built-in functions not overridable
+  - Cool swat features (^u^o)
+  - Source view area
+  - Variables view area
+  - Registers view area
+  - Compile Tcl to bytecode

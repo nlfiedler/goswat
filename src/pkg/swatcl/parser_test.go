@@ -195,6 +195,16 @@ func TestParseVariableDollar(t *testing.T) {
 	validateParser(state, parser, result, t)
 }
 
+func TestParseVariableDoubleDollar(t *testing.T) {
+	parser := NewParser("$$a")
+	state, _ := parser.parseVariable()
+	result := parserResult{stateOK, tokenString, 2, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseVariable()
+	result = parserResult{stateOK, tokenVariable, 0, 2, 2, 3, false}
+	validateParser(state, parser, result, t)
+}
+
 //
 // parseBrace
 //

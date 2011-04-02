@@ -8,13 +8,17 @@ package swatcl
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // NewInterpreter creates a new instance of Interpreter.
 func NewInterpreter() *Interpreter {
 	i := new(Interpreter)
 	i.frames = make([]callFrame, 0)
+	i.addFrame()
 	i.commands = make(map[string]swatclCmd, 0)
+	i.registerCoreCommands()
 	return i
 }
 
@@ -61,7 +65,7 @@ func (i *Interpreter) SetVariable(name, value string) *TclError {
 
 // RegisterCommand adds the named command function to the interpreter so
 // it may be invoked at a later time.
-func (i *Interpreter) RegisterCommand(name string, f commandFunc, privdata []byte) (parserState, *TclError) {
+func (i *Interpreter) RegisterCommand(name string, f commandFunc, privdata []string) (parserState, *TclError) {
 	_, ok := i.commands[name]
 	if ok {
 		i.result = fmt.Sprintf("Command '%s' already defined", name)
@@ -73,13 +77,20 @@ func (i *Interpreter) RegisterCommand(name string, f commandFunc, privdata []byt
 }
 
 // InvokeCommand will call the named command, passing the given arguments.
-func (i *Interpreter) InvokeCommand(name string, args []string) (parserState, *TclError) {
+func (i *Interpreter) InvokeCommand(argv []string) (parserState, *TclError) {
+	if len(argv) < 1 {
+		i.result = "InvokeCommand called without arguments"
+		return stateError, NewTclError(EILLARG, i.result)
+	}
+	name := argv[0]
 	c, ok := i.commands[name]
 	if !ok {
 		i.result = fmt.Sprintf("No such command '%s'", name)
 		return stateError, NewTclError(ECMDUNDEF, i.result)
 	}
-	return c.function(i, args, c.privdata), nil
+	s, r := c.function(i, argv, c.privdata)
+	i.result = r
+	return s, nil
 }
 
 // Evaluate interprets the given Tcl text.
@@ -112,10 +123,6 @@ func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
 			}
 			t = i.result
 
-		} else if p.token == tokenEscape {
-			// TODO: escape handling missing!
-			panic("missing escape handling in Evaluate()")
-
 		} else if p.token == tokenSeparator {
 			// Not finished parsing, continue
 			continue
@@ -124,7 +131,7 @@ func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
 		if p.token == tokenEOL {
 			if len(argv) > 0 {
 				// Parsing complete, invoke the command.
-				retcode, err := i.InvokeCommand(argv[0], argv[1:])
+				retcode, err := i.InvokeCommand(argv)
 				if retcode != stateOK {
 					return retcode, err
 				}
@@ -142,4 +149,46 @@ func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
 		}
 	}
 	return stateOK, nil
+}
+
+// registerCoreCommands registers the built-in commands provided by this
+// package so that they may be used by other Tcl scripts.
+func (i *Interpreter) registerCoreCommands() {
+//     int j; char *name[] = {"+","-","*","/",">",">=","<","<=","==","!="};
+//     for (j = 0; j < (int)(sizeof(name)/sizeof(char*)); j++)
+//         picolRegisterCommand(i,name[j],picolCommandMath,NULL);
+	i.RegisterCommand("set", commandSet, nil)
+	i.RegisterCommand("puts", commandPuts, nil)
+	i.RegisterCommand("if", commandIf, nil)
+    // picolRegisterCommand(i,"while",picolCommandWhile,NULL);
+    // picolRegisterCommand(i,"break",picolCommandRetCodes,NULL);
+    // picolRegisterCommand(i,"continue",picolCommandRetCodes,NULL);
+    // picolRegisterCommand(i,"proc",picolCommandProc,NULL);
+    // picolRegisterCommand(i,"return",picolCommandReturn,NULL);
+}
+
+// arityError is a convenience method for commands to report an error
+// with the number of arguments given to the command.
+func (i *Interpreter) arityError(name string) parserState {
+	i.result = fmt.Sprintf("Wrong number of arguments for %s", name)
+	return stateError
+}
+
+// parseBoolean attempts to interpret the given string as a boolean
+// expression. If expr is a number, 0 means false while all other number
+// result in true. If expr is "yes" or "true" then the result is true.
+// If expr is "no" or "false" then the result is false. Otherwise an
+// error is returned.
+func (i *Interpreter) parseBoolean(expr string) (bool, *TclError) {
+	n, err := strconv.Atoi(expr)
+	if err == nil {
+		return n != 0, nil
+	}
+	s := strings.ToLower(expr)
+	if s == "false" || s == "no" {
+		return false, nil
+	} else if s == "true" || s == "yes" {
+		return true, nil
+	}
+	return false, NewTclError(EBADBOOL, "expected true/false or yes/no")
 }
