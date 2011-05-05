@@ -68,7 +68,7 @@ func commandSet(i *Interpreter, argv []string, data []string) (parserState, stri
 		}
 		return stateOK, val
 	}
-	panic("unreachable code reached") // XXX: silly compiler...
+	panic("unreachable code reached")
 }
 
 //

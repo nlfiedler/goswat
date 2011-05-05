@@ -123,6 +123,13 @@ func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
 			}
 			t = i.result
 
+		} else if p.token == tokenEscape {
+			// TODO: handle variable reference or command invocation
+			// TODO: need to save parser state...
+			// TODO: evaluate variable/command...
+			// TODO: append result to existing string...
+			// TODO: continue parsing as string
+
 		} else if p.token == tokenSeparator {
 			// Not finished parsing, continue
 			continue

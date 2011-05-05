@@ -280,7 +280,7 @@ func TestInterpEvaluateVariable(t *testing.T) {
 
 func TestInterpParseBoolean(t *testing.T) {
 	interp := NewInterpreter()
-	badbools := [...]string{"foo", "1.0", "sure"}
+	badbools := [...]string{"foo", "1.0", "sure", "yesarooney", "no, sir"}
 	for bad := range badbools {
 		_, err := interp.parseBoolean(badbools[bad])
 		if err == nil || err.Errno != EBADBOOL {

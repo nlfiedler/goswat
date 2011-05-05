@@ -31,7 +31,13 @@ const (
 	tokenString    // string token
 	tokenCommand   // command token
 	tokenVariable  // variable token
+	tokenFunction  // expression function call
+	tokenOperator  // expression operator
+	tokenInteger   // integer literal
+	tokenFloat     // floating point literal
 	tokenSeparator // separator token
+	tokenComma     // comma (argument separator)
+	tokenParen     // open parenthesis
 	tokenEOL       // end-of-line token
 	tokenEOF       // end-of-file token
 )
@@ -79,13 +85,18 @@ type Interpreter struct {
 // Error constants
 const (
 	_         = iota
-	EBRACE    // EBRACE indicates an unmatched curly brace ({)
-	ECMDDEF   // indicates command is already defined
+	EBRACE    // found unmatched curly brace ({)
+	ECMDDEF   // command is already defined
 	EVARUNDEF // variable not defined
 	ECMDUNDEF // command not defined
 	ENOSTACK  // no call frames on the stack
 	EILLARG   // interpreter given illegal method arguments
 	EBADBOOL  // interpreter given a malformed boolean value
+	EBADEXPR  // invalid characters in expression
+	EOPERAND  // missing or malformed operand
+	EOPERATOR // invalid or unknown operator
+	EBADSTATE // expression evaluator in a bad state
+	EINVALNUM // invalid numeric expression
 )
 
 // TclError is used to provide information on the type of error that

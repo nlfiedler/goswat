@@ -67,7 +67,7 @@ func (p *Parser) parseComment() (parserState, *TclError) {
 // bracket ([) and advances to the end of the command (marked by a
 // closing square bracket (]).
 func (p *Parser) parseCommand() (parserState, *TclError) {
-	// skip over the initial open bracket ([)
+	// skip over the initial open bracket
 	level := 1
 	blevel := 0
 	p.p++
@@ -154,7 +154,7 @@ func (p *Parser) parseVariable() (parserState, *TclError) {
 // and advances to the subsequent closing brace, including any enclosed
 // open and closing curly braces.
 func (p *Parser) parseBrace() (parserState, *TclError) {
-	// skip over the initial open bracket
+	// skip over the initial open brace
 	level := 1
 	p.p++
 	p.len--
@@ -204,7 +204,7 @@ func (p *Parser) parseString() (parserState, *TclError) {
 	for {
 		if p.len == 0 {
 			p.end = p.p - 1
-			p.token = tokenEscape
+			p.token = tokenString
 			return stateOK, nil
 		}
 		switch p.text[p.p] {
@@ -221,13 +221,13 @@ func (p *Parser) parseString() (parserState, *TclError) {
 		case ' ', '\t', '\n', '\r', ';':
 			if !p.insidequote {
 				p.end = p.p - 1
-				p.token = tokenEscape
+				p.token = tokenString
 				return stateOK, nil
 			}
 		case '"':
 			if p.insidequote {
 				p.end = p.p - 1
-				p.token = tokenEscape
+				p.token = tokenString
 				p.p++
 				p.len--
 				p.insidequote = false
@@ -242,7 +242,7 @@ func (p *Parser) parseString() (parserState, *TclError) {
 
 // parseToken evaluates the token at the current position and parses
 // that token appropriately, returning the parser in a state such that
-// it indicates the type of the token, the the start/end points of the
+// it indicates the type of the token, and the start/end points of the
 // token.
 func (p *Parser) parseToken() (parserState, *TclError) {
 	for {
@@ -275,9 +275,194 @@ func (p *Parser) parseToken() (parserState, *TclError) {
 				continue
 			}
 			return p.parseString()
+			// TODO: handle trailing backslash (it and newline are replaced by a space)
 		default:
 			return p.parseString()
 		}
 	}
 	panic("reached unreachable code")
+}
+
+// parseExprToken is similar to parseToken and differs in that it
+// expects to be parsing an expression, as taken by the expr command.
+// Such expressions do not contain newlines, semicolons, or comments.
+// Expressions may include function invocations and operators and their
+// operands may be grouped within matching parentheses.
+func (p *Parser) parseExprToken() (parserState, *TclError) {
+	// Expressions do not have bare strings, so anything not
+	// inside quotes, braces, or brackets must be an operator,
+	// function call, or a number.
+	for {
+		if p.len == 0 {
+			p.token = tokenEOF
+			return stateOK, nil
+		}
+		switch p.text[p.p] {
+		case ' ', '\t', '\r':
+			if p.insidequote {
+				return p.parseString()
+			}
+			return p.parseSep()
+		case '\n', ';', '#':
+			return stateError, NewTclError(EBADEXPR,
+				"newline, semicolon, and hash not allowed in expression")
+		case '[':
+			return p.parseCommand()
+		case '$':
+			return p.parseVariable()
+		case '"':
+			return p.parseString()
+		case '{':
+			return p.parseBrace()
+		case '(':
+			p.start = p.p
+			p.end = p.p
+			p.p++
+			p.len--
+			p.token = tokenParen
+			return stateOK, nil
+		case '-', '+', '~', '!', '*', '/', '%', '<', '>', '=', '&', '^', '|', '?', ':':
+			return p.parseOperator()
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			return p.parseNumber()
+		case ',':
+			p.start = p.p
+			p.end = p.p
+			p.p++
+			p.len--
+			p.token = tokenComma
+			return stateOK, nil
+		default:
+			// Must be a function call
+			return p.parseFunction()
+		}
+	}
+	panic("reached unreachable code")
+}
+
+// parseOperator expects the current position to be an operator and
+// advances one or two characters depending on the width of the
+// operator.
+func (p *Parser) parseOperator() (parserState, *TclError) {
+	p.start = p.p
+	// skip over first operator character
+	p.p++
+	p.len--
+	// check for two character operator (**, <<, >>, <=, >=, &&, ||)
+	if p.len > 0 && (p.text[p.p] == '*' || p.text[p.p] == '>' ||
+		p.text[p.p] == '<' || p.text[p.p] == '=' ||
+		p.text[p.p] == '&' || p.text[p.p] == '|') {
+		p.p++
+		p.len--
+	}
+	p.end = p.p - 1
+	p.token = tokenOperator
+	return stateOK, nil
+}
+
+// parseNumber expects the current position to be the start of a numeric
+// literal, and advances to the end of the literal.
+func (p *Parser) parseNumber() (parserState, *TclError) {
+	p.start = p.p
+	float := false
+
+	//
+	// Can expect integer in octal, decimal, or hexadecimal, as well
+	// as floating point, with optional exponent. Any leading sign
+	// is handled elsewhere as a unary minus operator.
+	//
+	// 1
+	// 2.1
+	// 3.
+	// 6E4
+	// 7.91e+16
+	// .000001
+	// 0366 (octal)
+	// 0x7b5 (hexadecimal)
+	//
+
+	if p.len > 2 && p.text[p.p] == '0' && p.text[p.p+1] == 'x' {
+		p.p += 2
+		p.len -= 2
+		// hexadecimal integer, scan as such
+		for p.len > 0 && ((p.text[p.p] >= '0' && p.text[p.p] <= '9') ||
+			(p.text[p.p] >= 'a' && p.text[p.p] <= 'f') ||
+			(p.text[p.p] >= 'A' && p.text[p.p] <= 'F')) {
+			p.p++
+			p.len--
+		}
+	} else if p.len > 2 && p.text[p.p] == '0' && p.text[p.p+1] != '.' {
+		// octal integer, scan as such
+		for p.len > 0 && p.text[p.p] >= '0' && p.text[p.p] <= '7' {
+			p.p++
+			p.len--
+		}
+
+	} else {
+		// it is either decimal integer or floating point
+		sawexp := false
+		sawsign := false
+		for p.len > 0 {
+			if p.text[p.p] == '.' {
+				float = true
+			} else if p.text[p.p] == 'e' || p.text[p.p] == 'E' {
+				float = true
+				sawexp = true
+			} else if p.text[p.p] == '+' || p.text[p.p] == '-' {
+				if !sawexp {
+					// reached the end of the number
+					break
+				}
+				sawsign = true
+			} else if p.text[p.p] >= '0' && p.text[p.p] <= '9' {
+				if sawsign || sawexp {
+					// reset the flags now that we found a digit
+					sawsign = false
+					sawexp = false
+				}
+			} else {
+				break
+			}
+			p.p++
+			p.len--
+		}
+		if sawsign || sawexp {
+			// if still set, these indicate a malformed expression
+			return stateError, NewTclError(EBADEXPR, "malformed number")
+		}
+	}
+
+	p.end = p.p - 1
+	if float {
+		p.token = tokenFloat
+	} else {
+		p.token = tokenInteger
+	}
+	return stateOK, nil
+}
+
+// parseFunction expects the current position to be the start of a
+// function invocation, and advances to the opening parenthesis.
+func (p *Parser) parseFunction() (parserState, *TclError) {
+	p.start = p.p
+	// Scan forward as long as we see an alphanumeric string,
+	// stopping once we reach the open parenthesis.
+	sawparen := false
+	for p.len > 0 && ((p.text[p.p] >= '0' && p.text[p.p] <= '9') ||
+		(p.text[p.p] >= 'a' && p.text[p.p] <= 'z') ||
+		(p.text[p.p] >= 'A' && p.text[p.p] <= 'Z') ||
+		p.text[p.p] == '(') {
+		p.p++
+		p.len--
+		if p.text[p.p-1] == '(' {
+			sawparen = true
+			break
+		}
+	}
+	if !sawparen {
+		return stateError, NewTclError(EBADEXPR, "apparent function call missing ()")
+	}
+	p.end = p.p - 1
+	p.token = tokenFunction
+	return stateOK, nil
 }

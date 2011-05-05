@@ -25,25 +25,32 @@ type parserResult struct {
 // specified by the result, failing if that is not the case.
 func validateParser(state parserState, parser *Parser, result parserResult, t *testing.T) {
 	if state != result.state {
-		t.Errorf("state did not match (expected %d, actual %d)", result.state, state)
+		t.Errorf("state did not match for %s (expected %d, actual %d)",
+			parser.text, result.state, state)
 	}
 	if parser.token != result.token {
-		t.Errorf("token did not match (expected %d, actual %d)", result.token, parser.token)
+		t.Errorf("token did not match for %s (expected %d, actual %d)",
+			parser.text, result.token, parser.token)
 	}
 	if parser.start != result.start {
-		t.Errorf("start did not match (expected %d, actual %d)", result.start, parser.start)
+		t.Errorf("start did not match for %s (expected %d, actual %d)",
+			parser.text, result.start, parser.start)
 	}
 	if parser.p != result.p {
-		t.Errorf("p did not match (expected %d, actual %d)", result.p, parser.p)
+		t.Errorf("p did not match for %s (expected %d, actual %d)",
+			parser.text, result.p, parser.p)
 	}
 	if parser.end != result.end {
-		t.Errorf("end did not match (expected %d, actual %d)", result.end, parser.end)
+		t.Errorf("end did not match for %s (expected %d, actual %d)",
+			parser.text, result.end, parser.end)
 	}
 	if parser.len != result.len {
-		t.Errorf("len did not match (expected %d, actual %d)", result.len, parser.len)
+		t.Errorf("len did not match for %s (expected %d, actual %d)",
+			parser.text, result.len, parser.len)
 	}
 	if parser.insidequote != result.quote {
-		t.Errorf("insidequote did not match (expected %t, actual %t)", result.quote, parser.insidequote)
+		t.Errorf("insidequote did not match for %s (expected %t, actual %t)",
+			parser.text, result.quote, parser.insidequote)
 	}
 }
 
@@ -265,21 +272,21 @@ func TestParseStringEscapedBraces(t *testing.T) {
 func TestParseString(t *testing.T) {
 	parser := NewParser("\"foobar\"")
 	state, _ := parser.parseString()
-	result := parserResult{stateOK, tokenEscape, 0, 1, 6, 8, false}
+	result := parserResult{stateOK, tokenString, 0, 1, 6, 8, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseStringEscapes(t *testing.T) {
 	parser := NewParser("\"f\\to;o\\\"b\\na\\rr\"")
 	state, _ := parser.parseString()
-	result := parserResult{stateOK, tokenEscape, 0, 1, 15, 17, false}
+	result := parserResult{stateOK, tokenString, 0, 1, 15, 17, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseStringSeparators(t *testing.T) {
 	parser := NewParser("foo bar")
 	state, _ := parser.parseString()
-	result := parserResult{stateOK, tokenEscape, 4, 0, 2, 3, false}
+	result := parserResult{stateOK, tokenString, 4, 0, 2, 3, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -304,7 +311,7 @@ func TestParseStringCommand(t *testing.T) {
 func TestGetTokenWord(t *testing.T) {
 	parser := NewParser("foobar")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenEscape, 0, 0, 5, 6, false}
+	result := parserResult{stateOK, tokenString, 0, 0, 5, 6, false}
 	validateParser(state, parser, result, t)
 	if parser.GetTokenText() != "foobar" {
 		t.Error("GetTokenText failed")
@@ -345,7 +352,7 @@ func TestParseTokenBlank(t *testing.T) {
 func TestParseTokenWord(t *testing.T) {
 	parser := NewParser("foobar")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenEscape, 0, 0, 5, 6, false}
+	result := parserResult{stateOK, tokenString, 0, 0, 5, 6, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -394,27 +401,27 @@ func TestParseTokenEscapedBraces(t *testing.T) {
 func TestParseTokenQuoted(t *testing.T) {
 	parser := NewParser("\"foobar\"")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenEscape, 0, 1, 6, 8, false}
+	result := parserResult{stateOK, tokenString, 0, 1, 6, 8, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseTokenQuotedEscapes(t *testing.T) {
 	parser := NewParser("\"f\\to;o\\\"b\\na\\rr\"")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenEscape, 0, 1, 15, 17, false}
+	result := parserResult{stateOK, tokenString, 0, 1, 15, 17, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseTokenSeparators(t *testing.T) {
 	parser := NewParser("foo bar")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenEscape, 4, 0, 2, 3, false}
+	result := parserResult{stateOK, tokenString, 4, 0, 2, 3, false}
 	validateParser(state, parser, result, t)
 	state, _ = parser.parseToken()
 	result = parserResult{stateOK, tokenSeparator, 3, 3, 3, 4, false}
 	validateParser(state, parser, result, t)
 	state, _ = parser.parseToken()
-	result = parserResult{stateOK, tokenEscape, 0, 4, 6, 7, false}
+	result = parserResult{stateOK, tokenString, 0, 4, 6, 7, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -427,7 +434,7 @@ func TestParseTokenQuotedVariable(t *testing.T) {
 	result = parserResult{stateOK, tokenVariable, 1, 6, 8, 9, true}
 	validateParser(state, parser, result, t)
 	state, _ = parser.parseToken()
-	result = parserResult{stateOK, tokenEscape, 0, 9, 8, 10, false}
+	result = parserResult{stateOK, tokenString, 0, 9, 8, 10, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -440,14 +447,14 @@ func TestParseTokenNestedCommand(t *testing.T) {
 	result = parserResult{stateOK, tokenCommand, 1, 6, 8, 10, true}
 	validateParser(state, parser, result, t)
 	state, _ = parser.parseToken()
-	result = parserResult{stateOK, tokenEscape, 0, 10, 9, 11, false}
+	result = parserResult{stateOK, tokenString, 0, 10, 9, 11, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseTokenTrailingComment(t *testing.T) {
 	parser := NewParser("foo; # bar")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenEscape, 7, 0, 2, 3, false}
+	result := parserResult{stateOK, tokenString, 7, 0, 2, 3, false}
 	validateParser(state, parser, result, t)
 	state, _ = parser.parseToken()
 	result = parserResult{stateOK, tokenEOL, 5, 3, 4, 5, false}
@@ -463,6 +470,280 @@ func TestParseTokenLeadingSeparator(t *testing.T) {
 	result := parserResult{stateOK, tokenSeparator, 3, 0, 2, 3, false}
 	validateParser(state, parser, result, t)
 	state, _ = parser.parseToken()
-	result = parserResult{stateOK, tokenEscape, 0, 3, 5, 6, false}
+	result = parserResult{stateOK, tokenString, 0, 3, 5, 6, false}
 	validateParser(state, parser, result, t)
 }
+
+//
+// parseOperator
+//
+
+func TestParseOperator(t *testing.T) {
+	parser := NewParser("*a")
+	state, _ := parser.parseOperator()
+	result := parserResult{stateOK, tokenOperator, 1, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("**")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 1, 2, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("*")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("&")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("!")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("<=")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 1, 2, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("&&")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 1, 2, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("||")
+	state, _ = parser.parseOperator()
+	result = parserResult{stateOK, tokenOperator, 0, 0, 1, 2, false}
+	validateParser(state, parser, result, t)
+}
+
+//
+// parseNumber
+//
+
+func TestParseNumber(t *testing.T) {
+	parser := NewParser("0x00bab10c")
+	state, _ := parser.parseNumber()
+	result := parserResult{stateOK, tokenInteger, 0, 0, 9, 10, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("1")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenInteger, 0, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("2.1")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 2, 3, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("3.")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 1, 2, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser(".0001")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 4, 5, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("6E4")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 2, 3, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("6+0")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenInteger, 2, 0, 0, 1, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("6E")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateError, tokenEOL, 0, 0, 0, 2, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("7.91e+16")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 7, 8, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("1e+012")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 5, 6, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("0366")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenInteger, 0, 0, 3, 4, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("0070/")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenInteger, 1, 0, 3, 4, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("0070*")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenInteger, 1, 0, 3, 4, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("10101010")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenInteger, 0, 0, 7, 8, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("4.4408920985006262e-016")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateOK, tokenFloat, 0, 0, 22, 23, false}
+	validateParser(state, parser, result, t)
+}
+
+//
+// parseFunction
+//
+
+func TestParseFunction(t *testing.T) {
+	parser := NewParser("atoi('123')")
+	state, _ := parser.parseFunction()
+	result := parserResult{stateOK, tokenFunction, 6, 0, 4, 5, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("AT0I('123')")
+	state, _ = parser.parseFunction()
+	result = parserResult{stateOK, tokenFunction, 6, 0, 4, 5, false}
+	validateParser(state, parser, result, t)
+}
+
+//
+// parseExprToken
+//
+
+func TestParseExprTokenBlank(t *testing.T) {
+	parser := NewParser("")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenEOF, 0, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenWord(t *testing.T) {
+	parser := NewParser("foobar")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateError, tokenEOL, 0, 0, 0, 6, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenVariable(t *testing.T) {
+	parser := NewParser("$foobar")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenVariable, 0, 1, 6, 7, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenEol(t *testing.T) {
+	parser := NewParser("; \n \t \r")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateError, tokenEOL, 7, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenComment(t *testing.T) {
+	parser := NewParser("# foo")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateError, tokenEOL, 5, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenEmptyBraces(t *testing.T) {
+	parser := NewParser("{}")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenString, 0, 1, 0, 2, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenNestedBraces(t *testing.T) {
+	parser := NewParser("{foo{bar}}")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenString, 0, 1, 8, 10, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenEscapedBraces(t *testing.T) {
+	parser := NewParser("{foo\\{bar\\}}")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenString, 0, 1, 10, 12, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenQuoted(t *testing.T) {
+	parser := NewParser("\"foobar\"")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenString, 0, 1, 6, 8, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenQuotedEscapes(t *testing.T) {
+	parser := NewParser("\"f\\to;o\\\"b\\na\\rr\"")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenString, 0, 1, 15, 17, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenSeparators(t *testing.T) {
+	parser := NewParser("$foo + $bar")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenVariable, 7, 1, 3, 4, false}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenSeparator, 6, 4, 4, 5, false}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenOperator, 5, 5, 5, 6, false}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenSeparator, 4, 6, 6, 7, false}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenVariable, 0, 8, 10, 11, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenQuotedVariable(t *testing.T) {
+	parser := NewParser("\"foo $bar\"")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenEscape, 5, 1, 4, 5, true}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenVariable, 1, 6, 8, 9, true}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenString, 0, 9, 8, 10, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenNestedCommand(t *testing.T) {
+	parser := NewParser("\"foo [bar]\"")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenEscape, 6, 1, 4, 5, true}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenCommand, 1, 6, 8, 10, true}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenString, 0, 10, 9, 11, false}
+	validateParser(state, parser, result, t)
+}
+
+func TestParseExprTokenLeadingSeparator(t *testing.T) {
+	parser := NewParser("   $foo")
+	state, _ := parser.parseExprToken()
+	result := parserResult{stateOK, tokenSeparator, 4, 0, 2, 3, false}
+	validateParser(state, parser, result, t)
+	state, _ = parser.parseExprToken()
+	result = parserResult{stateOK, tokenVariable, 0, 4, 6, 7, false}
+	validateParser(state, parser, result, t)
+}
+
+// TODO: write parseExprToken tests for parsing function calls

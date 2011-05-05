@@ -10,6 +10,7 @@ TARG=swatcl
 GOFILES=\
 	commands.go\
 	defs.go\
+	expr.go\
 	interpreter.go\
 	parser.go\
 
