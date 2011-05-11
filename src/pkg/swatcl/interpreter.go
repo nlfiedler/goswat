@@ -8,8 +8,6 @@ package swatcl
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 // NewInterpreter creates a new instance of Interpreter.
@@ -179,23 +177,4 @@ func (i *Interpreter) registerCoreCommands() {
 func (i *Interpreter) arityError(name string) parserState {
 	i.result = fmt.Sprintf("Wrong number of arguments for %s", name)
 	return stateError
-}
-
-// parseBoolean attempts to interpret the given string as a boolean
-// expression. If expr is a number, 0 means false while all other number
-// result in true. If expr is "yes" or "true" then the result is true.
-// If expr is "no" or "false" then the result is false. Otherwise an
-// error is returned.
-func (i *Interpreter) parseBoolean(expr string) (bool, *TclError) {
-	n, err := strconv.Atoi(expr)
-	if err == nil {
-		return n != 0, nil
-	}
-	s := strings.ToLower(expr)
-	if s == "false" || s == "no" {
-		return false, nil
-	} else if s == "true" || s == "yes" {
-		return true, nil
-	}
-	return false, NewTclError(EBADBOOL, "expected true/false or yes/no")
 }

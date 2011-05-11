@@ -219,28 +219,28 @@ func TestParseVariableDoubleDollar(t *testing.T) {
 func TestParseBrace(t *testing.T) {
 	parser := NewParser("{foo}")
 	state, _ := parser.parseBrace()
-	result := parserResult{stateOK, tokenString, 0, 1, 3, 5, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 3, 5, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseBraceEmpty(t *testing.T) {
 	parser := NewParser("{}")
 	state, _ := parser.parseBrace()
-	result := parserResult{stateOK, tokenString, 0, 1, 0, 2, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 0, 2, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseBraceNested(t *testing.T) {
 	parser := NewParser("{foo{bar}}")
 	state, _ := parser.parseBrace()
-	result := parserResult{stateOK, tokenString, 0, 1, 8, 10, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 8, 10, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseBraceEscaped(t *testing.T) {
 	parser := NewParser("{foo\\{bar\\}}")
 	state, _ := parser.parseBrace()
-	result := parserResult{stateOK, tokenString, 0, 1, 10, 12, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 10, 12, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -251,21 +251,21 @@ func TestParseBraceEscaped(t *testing.T) {
 func TestParseStringEmptyBraces(t *testing.T) {
 	parser := NewParser("{}")
 	state, _ := parser.parseString()
-	result := parserResult{stateOK, tokenString, 0, 1, 0, 2, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 0, 2, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseStringNestedBraces(t *testing.T) {
 	parser := NewParser("{foo{bar}}")
 	state, _ := parser.parseString()
-	result := parserResult{stateOK, tokenString, 0, 1, 8, 10, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 8, 10, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseStringEscapedBraces(t *testing.T) {
 	parser := NewParser("{foo\\{bar\\}}")
 	state, _ := parser.parseString()
-	result := parserResult{stateOK, tokenString, 0, 1, 10, 12, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 10, 12, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -380,21 +380,21 @@ func TestParseTokenComment(t *testing.T) {
 func TestParseTokenEmptyBraces(t *testing.T) {
 	parser := NewParser("{}")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenString, 0, 1, 0, 2, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 0, 2, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseTokenNestedBraces(t *testing.T) {
 	parser := NewParser("{foo{bar}}")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenString, 0, 1, 8, 10, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 8, 10, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseTokenEscapedBraces(t *testing.T) {
 	parser := NewParser("{foo\\{bar\\}}")
 	state, _ := parser.parseToken()
-	result := parserResult{stateOK, tokenString, 0, 1, 10, 12, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 10, 12, false}
 	validateParser(state, parser, result, t)
 }
 
@@ -659,21 +659,21 @@ func TestParseExprTokenComment(t *testing.T) {
 func TestParseExprTokenEmptyBraces(t *testing.T) {
 	parser := NewParser("{}")
 	state, _ := parser.parseExprToken()
-	result := parserResult{stateOK, tokenString, 0, 1, 0, 2, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 0, 2, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseExprTokenNestedBraces(t *testing.T) {
 	parser := NewParser("{foo{bar}}")
 	state, _ := parser.parseExprToken()
-	result := parserResult{stateOK, tokenString, 0, 1, 8, 10, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 8, 10, false}
 	validateParser(state, parser, result, t)
 }
 
 func TestParseExprTokenEscapedBraces(t *testing.T) {
 	parser := NewParser("{foo\\{bar\\}}")
 	state, _ := parser.parseExprToken()
-	result := parserResult{stateOK, tokenString, 0, 1, 10, 12, false}
+	result := parserResult{stateOK, tokenBrace, 0, 1, 10, 12, false}
 	validateParser(state, parser, result, t)
 }
 

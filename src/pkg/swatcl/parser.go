@@ -172,7 +172,7 @@ func (p *Parser) parseBrace() (parserState, *TclError) {
 					p.p++
 					p.len--
 				}
-				p.token = tokenString
+				p.token = tokenBrace
 				return stateOK, nil
 			}
 		} else if p.text[p.p] == '{' {

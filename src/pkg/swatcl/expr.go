@@ -107,12 +107,15 @@ func (n *exprNode) evaluate() (interface{}, *TclError) {
 				return "", NewTclError(EINVALNUM, n.text)
 			}
 			if err == os.ERANGE {
-				// TODO: convert to big integer
+				// TODO: convert to big float
 			}
 		}
 		return v, nil
 	case tokenString:
-		// TODO: perform basic string interpretation (slash escapes)
+		// perform basic string substitution (slash escapes)
+		return evalString(n.text)
+	case tokenBrace:
+		// return the string as-is
 		return n.text, nil
 	}
 	return "", nil
@@ -518,7 +521,7 @@ func EvaluateExpression(expr string) (string, *TclError) {
 		t := p.GetTokenText()
 		if p.token == tokenVariable || p.token == tokenCommand ||
 			p.token == tokenInteger || p.token == tokenFloat ||
-			p.token == tokenString {
+			p.token == tokenString || p.token == tokenBrace {
 			node := newExprNode(p.token, t)
 			e.arguments.Push(node)
 			e.state = searchOperator

@@ -56,7 +56,7 @@ func TestExprString(t *testing.T) {
 	values["\"123\""] = "123"
 	values["\"0xcafebabe\""] = "0xcafebabe"
 	values["\"foobar\""] = "foobar"
-	//values["\"foo\\nbar\""] = "foo\nbar" TODO
+	values["\"foo\\nbar\""] = "foo\nbar"
 	values["{foobar}"] = "foobar"
 	values["{foo\\nbar}"] = "foo\\nbar"
 	evaluateAndCompare(values, t)

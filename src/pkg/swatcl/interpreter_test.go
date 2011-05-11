@@ -277,31 +277,3 @@ func TestInterpEvaluateVariable(t *testing.T) {
 // TODO: test evaluate nested command
 // TODO: test evaluate braced string
 // TODO: test evaluate quoted string
-
-func TestInterpParseBoolean(t *testing.T) {
-	interp := NewInterpreter()
-	badbools := [...]string{"foo", "1.0", "sure", "yesarooney", "no, sir"}
-	for bad := range badbools {
-		_, err := interp.parseBoolean(badbools[bad])
-		if err == nil || err.Errno != EBADBOOL {
-			t.Error("expected bad boolean error")
-		}
-	}
-	tests := make(map[string]bool)
-	tests["FaLse"] = false
-	tests["tRUE"] = true
-	tests["No"] = false
-	tests["yeS"] = true
-	tests["0"] = false
-	tests["1"] = true
-	tests["10"] = true
-	for k, v := range tests {
-		b, err := interp.parseBoolean(k)
-		if err != nil {
-			t.Errorf("unexpected error in parseBoolean: %s", err)
-		}
-		if b != v {
-			t.Errorf("expected %t for %s", v, k)
-		}
-	}
-}

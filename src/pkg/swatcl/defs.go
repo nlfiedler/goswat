@@ -29,6 +29,7 @@ const (
 	_              = iota
 	tokenEscape    // escape token
 	tokenString    // string token
+	tokenBrace     // uninterpreted string token
 	tokenCommand   // command token
 	tokenVariable  // variable token
 	tokenFunction  // expression function call

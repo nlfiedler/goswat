@@ -22,7 +22,7 @@ func commandIf(i *Interpreter, argv []string, data []string) (parserState, strin
 		return state, err.String()
 	}
 	// TODO: support additional elseif/then clauses
-	b, err := i.parseBoolean(i.result)
+	b, err := evalBoolean(i.result)
 	if err != nil {
 		return stateError, err.String()
 	}
