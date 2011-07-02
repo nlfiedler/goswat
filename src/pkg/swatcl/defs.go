@@ -109,7 +109,7 @@ type TclError struct {
 
 // NewTclError creates a new TclError based on the given values.
 func NewTclError(err int, msg string) *TclError {
-	return &TclError{os.Errno(err), os.ErrorString(msg)}
+	return &TclError{os.Errno(err), os.NewError(msg)}
 }
 
 // String returns the string representation of the error.
