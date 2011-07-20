@@ -29,6 +29,9 @@ GoSwat Checklist (-*- text -*-)
   - not a full fledged Tcl interpreter
   - has most of the basics
 - Write a basic Tcl interpreter based on the picol example
+- Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
+- Utilize termbox (https://github.com/nsf/termbox) or gocurse (https://github.com/jabb/gocurse)
+  to facilitate a psuedo GUI in the console
 - Features
   - Breakpoint tags vs. groups
   - Built-in functions not overridable
