@@ -599,6 +599,26 @@ func TestParseNumber(t *testing.T) {
 	state, _ = parser.parseNumber()
 	result = parserResult{stateOK, tokenFloat, 0, 0, 22, 23, false}
 	validateParser(state, parser, result, t)
+
+	parser = NewParser("+123")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateError, tokenEOL, 4, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("-42")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateError, tokenEOL, 3, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("!@$%")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateError, tokenEOL, 4, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
+
+	parser = NewParser("a.10")
+	state, _ = parser.parseNumber()
+	result = parserResult{stateError, tokenEOL, 4, 0, 0, 0, false}
+	validateParser(state, parser, result, t)
 }
 
 //

@@ -10,42 +10,22 @@ package swatcl
 // Expression parser and evaluator for Tcl expressions.
 //
 // Infix expressions can be parsed from a series of tokens using two
-// stacks. One stack is used to hold parse trees under construction
-// (the argument stack), the other to hold operators (and left
-// parentheses, for matching purposes; the operator stack).
+// stacks. One stack is used to hold parse trees under construction (the
+// argument stack), the other to hold operators (and left parentheses,
+// for matching purposes; the operator stack).
 //
-// As we read in each new token (from left to right), we either push
-// the token (or a related tree) onto one of the stacks, or we
-// reduce the stacks by combining an operator with some arguments.
-// Along the way, it will be helpful to maintain a search state
-// which tells us whether we should see an argument or operator next
-// (the search state helps us to reject malformed expressions).
+// As we read in each new token (from left to right), we either push the
+// token (or a related tree) onto one of the stacks, or we reduce the
+// stacks by combining an operator with some arguments. Along the way,
+// it will be helpful to maintain a search state which tells us whether
+// we should see an argument or operator next (the search state helps us
+// to reject malformed expressions).
 //
 
 import (
 	"container/vector"
 	"fmt"
-	"os"
-	"strconv"
 )
-
-// TODO: support following operators
-// Listed by order of decreasing precedence
-// - + ~ ! (unary)
-// ** (exponentiation)
-// * / %
-// + - (binary)
-// << >> (shift)
-// < > <= >=
-// eq ne in ni
-// &
-// ^
-// |
-// &&
-// ||
-// x?y:z
-
-// TODO: support grouping with parentheses
 
 // TODO: support variable references in expressions
 
@@ -62,6 +42,10 @@ import (
 // tan         tanh        wide
 // (where double, int, wide, entier are type conversions)
 
+// searchState indicates what the expression evaluator is expecting
+// to see next, typically either an argument or an operator. This is
+// used to determine whether certain operators are binary or unary,
+// such as + and - which can be both.
 type searchState int
 
 const (
@@ -70,47 +54,42 @@ const (
 	searchOperator // expecting an operator
 )
 
+type Evaluator interface {
+	evaluate() (interface{}, *TclError)
+}
+
+// exprNode contains the attributes of an expression node, whether it
+// is a numeric or string literal, or a command or variable reference.
 type exprNode struct {
 	token    parserToken
 	text     string
+	eval     *evaluator
 }
 
-func newExprNode(token parserToken, text string) *exprNode {
-	return &exprNode{token, text}
+// newExprNode creates a new expression node based on the token and text.
+func newExprNode(eval *evaluator, token parserToken, text string) *exprNode {
+	return &exprNode{token, text, eval}
 }
 
+// evaluate evaluates the expression node appropriately based on its type.
 func (n *exprNode) evaluate() (interface{}, *TclError) {
 	switch n.token {
 	case tokenVariable:
-		return "$var", nil
+		str, err := n.eval.interp.GetVariable(n.text)
+		if err != nil {
+			return "", err
+		}
+		val, err := coerceNumber(str)
+		if err != nil {
+			return "", err
+		}
+		return val, nil
 	case tokenCommand:
-		return "[cmd]", nil
+		return "[cmd]", nil // TODO: implement command invocation
 	case tokenInteger:
-		// let strconv detect the number base for us
-		// (either binary, decimal, or hexadecimal)
-		v, err := strconv.Btoi64(n.text, 0)
-		if err != nil {
-			if err == os.EINVAL {
-				// the parser messed up if this happens
-				return "", NewTclError(EINVALNUM, n.text)
-			}
-			if err == os.ERANGE {
-				// TODO: convert to big integer
-			}
-		}
-		return v, nil
+		return atoi(n.text)
 	case tokenFloat:
-		v, err := strconv.Atof64(n.text)
-		if err != nil {
-			if err == os.EINVAL {
-				// the parser messed up if this happens
-				return "", NewTclError(EINVALNUM, n.text)
-			}
-			if err == os.ERANGE {
-				// TODO: convert to big float
-			}
-		}
-		return v, nil
+		return atof(n.text)
 	case tokenString:
 		// perform basic string substitution (slash escapes)
 		return evalString(n.text)
@@ -121,42 +100,29 @@ func (n *exprNode) evaluate() (interface{}, *TclError) {
 	return "", nil
 }
 
-type operatorNode struct {
-	exprNode
-	arity      int      // 1 for unary, 2 for binary
-	left       *exprNode // left child node
-	right      *exprNode // right child node
-	precedence int  // operator precedence (with 1 being the highest)
-	sentinel   bool // true if this is a sentinel node (e.g. left parenthesis)
-}
-
-// TODO: left paren is an operator node with precedence of 1 and a sentinel flag
-
-func newOperatorNode() *operatorNode {
-	return &operatorNode{} // TODO
-}
-
-func (o *operatorNode) evaluate() {
-	// TODO: based on the operator token, call the appropriate function with the operand(s)
-}
-
 type functionNode struct {
 	exprNode
 	arguments vector.Vector // function arguments
 }
 
+func (f *functionNode) evaluate() {
+	// TODO: evaluate the arguments and invoke the function
+}
+
 type evaluator struct {
 	state     searchState
-	root      *exprNode     // root of the expression tree
+	root      Evaluator     // root of the expression tree
+	interp    *Interpreter  // contains program state
 	arguments vector.Vector // argument stack
 	operators vector.Vector // operator stack
 	funcCount int
 	//prevToken parserToken
 }
 
-func newEvaluator() *evaluator {
+func newEvaluator(interp *Interpreter) *evaluator {
 	e := &evaluator{}
 	e.state = searchArgument
+	e.interp = interp
 	return e
 }
 
@@ -241,9 +207,9 @@ func (e *evaluator) handleEOF() *TclError {
 		}
 	}
         if e.arguments.Len() > 0 {
-		topArg, ok := e.arguments.Pop().(*exprNode)
+		topArg, ok := e.arguments.Pop().(Evaluator)
                 if !ok {
-			return NewTclError(EBADSTATE, "node on argument stack is not an exprNode!")
+			return NewTclError(EBADSTATE, "node on argument stack is not an Evaluator!")
 		}
 		if e.arguments.Len() == 0 && e.operators.Len() == 0 {
 			e.root = topArg
@@ -469,37 +435,15 @@ func (e *evaluator) handleComma() *TclError {
 	return nil
 }
 
-    // @Override
-    // public void caseTPlus(TPlus node) {
-    //     // The plus is unary if we are expecting an argument or if
-    //     // the argument stack is empty (ie. search state is 'start').
-    //     if (searchState == State.ARGUMENT) {
-    //         handleOperator(new PlusUnaryOperatorNode(node));
-    //     } else {
-    //         handleOperator(new PlusBinaryOperatorNode(node));
-    //     }
-    // }
-
-    // @Override
-    // public void caseTMinus(TMinus node) {
-    //     // The minus is unary if we are expecting an argument or if
-    //     // the argument stack is empty (ie. search state is 'start').
-    //     if (searchState == State.ARGUMENT) {
-    //         handleOperator(new MinusUnaryOperatorNode(node));
-    //     } else {
-    //         handleOperator(new MinusBinaryOperatorNode(node));
-    //     }
-    // }
-
 // TODO: see the other relevant case methods in TreeBuilder.java
 
 // EvaluateExpression parses the input string as a Tcl expression,
 // evaluating it and returning the result. Supported expressions include
 // variable references, nested commands (inside square brackets), string
 // and numeric literals, and math and type coercion functions.
-func EvaluateExpression(expr string) (string, *TclError) {
+func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 	p := NewParser(expr)
-	e := newEvaluator()
+	e := newEvaluator(interp)
 
 	// TODO: get the evaluator working for simple operators (+ - / *)
 	// TODO: get the evaluator working with operator precedence (e.g. * before +)
@@ -509,7 +453,7 @@ func EvaluateExpression(expr string) (string, *TclError) {
 	// TODO: get the evaluator working for function invocation
 
 	for {
-		// TODO: pull tokens from parser, building expression tree
+		// pull tokens from parser, building expression tree
 		p.parseExprToken()
 		if p.token == tokenEOF {
 			err := e.handleEOF()
@@ -522,17 +466,45 @@ func EvaluateExpression(expr string) (string, *TclError) {
 		if p.token == tokenVariable || p.token == tokenCommand ||
 			p.token == tokenInteger || p.token == tokenFloat ||
 			p.token == tokenString || p.token == tokenBrace {
-			node := newExprNode(p.token, t)
+			node := newExprNode(e, p.token, t)
 			e.arguments.Push(node)
 			e.state = searchOperator
 
 		} else if p.token == tokenOperator {
-			// TODO: handle operators
+			// based on search state, it's either a unary or binary operator
+			var node *operatorNode
+			if e.state == searchOperator {
+				node = newOperatorNode(e, p.token, t, 2)
+			} else if e.state == searchArgument {
+				node = newOperatorNode(e, p.token, t, 1)
+			}
+
+			// If the operator stack is empty, push the new operator.
+			// If it has an operator on top, compare the precedence
+			// of the two and push the new one if it has lower precedence
+			// (or equal precedence: this will force left associativity).
+			// Otherwise reduce the two stacks.
+			if (e.operators.Len() > 0) {
+				top, ok := e.operators.Last().(*operatorNode)
+				if !ok {
+					return "", NewTclError(EBADSTATE,
+						"node on operator stack is not an operatorNode!")
+				}
+				if (!top.sentinel && node.precedence >= top.precedence) {
+					err := e.reduce()
+					if err != nil {
+						return "", err
+					}
+				}
+			}
+			e.operators.Push(node)
+			e.state = searchArgument
 
 		} else if p.token == tokenFunction {
 			// TODO: expecting arguments until right parenthesis encountered
 			e.funcCount++
-			node := newExprNode(p.token, t)
+			// TODO: should be constructing functionNode here
+			node := newExprNode(e, p.token, t)
 			// Put it on the argument stack as a sentinel, to mark
 			// the beginning of the method arguments.
 			e.arguments.Push(node)

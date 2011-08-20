@@ -20,15 +20,8 @@ GoSwat Checklist (-*- text -*-)
     - processes
     - threads
     - registers
-+ evaluate Picol as an alternative to gotcl (http://antirez.com/page/picol.html)
-  - looks good; easy to understand; clean C code
-  - needs to be translated to idiomatic Go code
-  - less code to start with, so more work/fun to develop
-+ evaluate gotcl (http://code.google.com/p/gotcl/)
-  - so called "tcl-like" language, probably not a good base for starting
-  - not a full fledged Tcl interpreter
-  - has most of the basics
 - Write a basic Tcl interpreter based on the picol example
+  - When it can execute basic Tcl scripts, set up the project on Google Code
 - Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
 - Utilize termbox (https://github.com/nsf/termbox) or gocurse (https://github.com/jabb/gocurse)
   to facilitate a psuedo GUI in the console

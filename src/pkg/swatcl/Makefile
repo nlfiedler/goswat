@@ -14,5 +14,6 @@ GOFILES=\
 	expr.go\
 	interpreter.go\
 	parser.go\
+	operator.go\
 
 include $(GOROOT)/src/Make.pkg

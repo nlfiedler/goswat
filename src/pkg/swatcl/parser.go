@@ -391,6 +391,7 @@ func (p *Parser) parseNumber() (parserState, *TclError) {
 			p.p++
 			p.len--
 		}
+
 	} else if p.len > 2 && p.text[p.p] == '0' && p.text[p.p+1] != '.' {
 		// octal integer, scan as such
 		for p.len > 0 && p.text[p.p] >= '0' && p.text[p.p] <= '7' {
@@ -398,7 +399,8 @@ func (p *Parser) parseNumber() (parserState, *TclError) {
 			p.len--
 		}
 
-	} else {
+	} else if (p.len > 1 && p.text[p.p] == '.') ||
+		(p.len > 0 && p.text[p.p] >= '0' && p.text[p.p] <= '9') {
 		// it is either decimal integer or floating point
 		sawexp := false
 		sawsign := false
@@ -430,6 +432,10 @@ func (p *Parser) parseNumber() (parserState, *TclError) {
 			// if still set, these indicate a malformed expression
 			return stateError, NewTclError(EBADEXPR, "malformed number")
 		}
+
+	} else {
+		// this is not a valid number
+		return stateError, NewTclError(EBADEXPR, "malformed number")
 	}
 
 	p.end = p.p - 1

@@ -98,6 +98,7 @@ const (
 	EOPERATOR // invalid or unknown operator
 	EBADSTATE // expression evaluator in a bad state
 	EINVALNUM // invalid numeric expression
+	ENUMRANGE // numeric value out of supported range
 )
 
 // TclError is used to provide information on the type of error that
