@@ -10,6 +10,32 @@ import (
 	"testing"
 )
 
+func assertNoError(t *testing.T, err *TclError) {
+	if err != nil {
+		t.Errorf("error in addition: %s", err)
+	}
+}
+
+func assertError(t *testing.T, err *TclError) {
+	if err == nil {
+		t.Error("expected an error")
+	}
+}
+
+// evalStrAndCompare invokes evalString on each of the map keys and
+// compares the result to the corresponding map value.
+func evalStrAndCompare(values map[string]string, t *testing.T) {
+	for k, v := range values {
+		r, e := evalString(k)
+		if e != nil {
+			t.Errorf("evaluation of '%s' failed: %s", k, e)
+		}
+		if r != v {
+			t.Errorf("evaluation of '%s' resulted in '%s'", k, r)
+		}
+	}
+}
+
 func TestEvalBoolean(t *testing.T) {
 	badbools := [...]string{"foo", "1.0", "sure", "yesarooney", "no, sir"}
 	for bad := range badbools {
@@ -33,20 +59,6 @@ func TestEvalBoolean(t *testing.T) {
 		}
 		if b != v {
 			t.Errorf("expected %t for %s", v, k)
-		}
-	}
-}
-
-// evalStrAndCompare invokes evalString on each of the map keys and
-// compares the result to the corresponding map value.
-func evalStrAndCompare(values map[string]string, t *testing.T) {
-	for k, v := range values {
-		r, e := evalString(k)
-		if e != nil {
-			t.Errorf("evaluation of '%s' failed: %s", k, e)
-		}
-		if r != v {
-			t.Errorf("evaluation of '%s' resulted in '%s'", k, r)
 		}
 	}
 }
@@ -113,83 +125,180 @@ func TestCoerceNumber(t *testing.T) {
 }
 
 func TestPerformAddition(t *testing.T) {
-	assertNoError := func(err *TclError) {
-		if err != nil {
-			t.Errorf("error in addition: %s", err)
-		}
-	}
 	v, err := performAddition(int64(1), int64(1))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != int64(2) {
 		t.Errorf("1 + 1 = %v ?!?", v)
 	}
 	v, err = performAddition(float64(1.234), int64(1))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != float64(2.234) {
 		t.Errorf("1.234 + 1 = %v ?!?", v)
 	}
 	v, err = performAddition(int64(1), float64(1.234))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != float64(2.234) {
 		t.Errorf("1 + 1.234 = %v ?!?", v)
 	}
 	v, err = performAddition(float64(1.1), float64(1.1))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != float64(2.2) {
 		t.Errorf("1.1 + 1.1 = %v ?!?", v)
 	}
-	v, err = performAddition("abc", int64(1))
-	assertNoError(err)
-	if v != "abc1" {
-		t.Errorf("abc + 1 = %v ?!?", v)
+	v, err = performAddition(int64(9223372036854775807), int64(1))
+	assertNoError(t, err)
+	if v != int64(-9223372036854775808) {
+		t.Errorf("9223372036854775807 + 1 = %v ?!?", v)
 	}
-	v, err = performAddition(int64(1), "abc")
-	assertNoError(err)
-	if v != "1abc" {
-		t.Errorf("1 + abc = %v ?!?", v)
-	}
-	v, err = performAddition("abc", "123")
-	assertNoError(err)
-	if v != "abc123" {
-		t.Errorf("'abc' + '123' = %v ?!?", v)
-	}
+	_, err = performAddition("abc", int64(1))
+	assertError(t, err)
+	_, err = performAddition(int64(1), "abc")
+	assertError(t, err)
+	_, err = performAddition("abc", "123")
+	assertError(t, err)
 }
 
 func TestPerformSubtraction(t *testing.T) {
-	assertNoError := func(err *TclError) {
-		if err != nil {
-			t.Errorf("error in subtraction: %s", err)
-		}
-	}
 	v, err := performSubtraction(int64(1), int64(1))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != int64(0) {
 		t.Errorf("1 - 1 = %v ?!?", v)
 	}
 	v, err = performSubtraction(float64(1.234), int64(1))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != float64(0.23399999999999999) {
 		t.Errorf("1.234 - 1 = %v ?!?", v)
 	}
 	v, err = performSubtraction(int64(1), float64(1.234))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != float64(-0.23399999999999999) {
 		t.Errorf("1 - 1.234 = %v ?!?", v)
 	}
 	v, err = performSubtraction(float64(1.1), float64(1.1))
-	assertNoError(err)
+	assertNoError(t, err)
 	if v != float64(0) {
 		t.Errorf("1.1 - 1.1 = %v ?!?", v)
 	}
-	assertError := func(err *TclError) {
-		if err == nil {
-			t.Error("expected an error")
-		}
+	_, err = performSubtraction("abc", int64(1))
+	assertError(t, err)
+	_, err = performSubtraction(int64(1), "abc")
+	assertError(t, err)
+	_, err = performSubtraction("abc", "123")
+	assertError(t, err)
+}
+
+func TestPerformMultiplication(t *testing.T) {
+	v, err := performMultiplication(int64(1), int64(1))
+	assertNoError(t, err)
+	if v != int64(1) {
+		t.Errorf("1 * 1 = %v ?!?", v)
 	}
-	v, err = performSubtraction("abc", int64(1))
-	assertError(err)
-	v, err = performSubtraction(int64(1), "abc")
-	assertError(err)
-	v, err = performSubtraction("abc", "123")
-	assertError(err)
+	v, err = performMultiplication(int64(101), int64(100))
+	assertNoError(t, err)
+	if v != int64(10100) {
+		t.Errorf("101 * 100 = %v ?!?", v)
+	}
+	v, err = performMultiplication(float64(1.234), int64(4))
+	assertNoError(t, err)
+	if v != float64(4.936) {
+		t.Errorf("1.234 * 4 = %v ?!?", v)
+	}
+	v, err = performMultiplication(int64(4), float64(1.234))
+	assertNoError(t, err)
+	if v != float64(4.936) {
+		t.Errorf("4 * 1.234 = %v ?!?", v)
+	}
+	v, err = performMultiplication(float64(1.2), float64(1.5))
+	assertNoError(t, err)
+	if v != float64(1.7999999999999998) {
+		t.Errorf("1.2 * 1.5 = %v ?!?", v)
+	}
+	v, err = performMultiplication(int64(9223372036854775807), int64(2))
+	assertNoError(t, err)
+	if v != int64(-2) {
+		t.Errorf("9223372036854775807 * 2 = %v ?!?", v)
+	}
+	_, err = performMultiplication("abc", int64(1))
+	assertError(t, err)
+	_, err = performMultiplication(int64(1), "abc")
+	assertError(t, err)
+	_, err = performMultiplication("abc", "123")
+	assertError(t, err)
+}
+
+func TestPerformDivision(t *testing.T) {
+	v, err := performDivision(int64(4), int64(2))
+	assertNoError(t, err)
+	if v != int64(2) {
+		t.Errorf("4 / 2 = %v ?!?", v)
+	}
+	v, err = performDivision(int64(100), int64(100))
+	assertNoError(t, err)
+	if v != int64(1) {
+		t.Errorf("100 / 100 = %v ?!?", v)
+	}
+	v, err = performDivision(float64(1.234), int64(4))
+	assertNoError(t, err)
+	if v != float64(0.3085) {
+		t.Errorf("1.234 / 4 = %v ?!?", v)
+	}
+	v, err = performDivision(int64(4), float64(1.234))
+	assertNoError(t, err)
+	if v != float64(3.2414910858995136) {
+		t.Errorf("4 / 1.234 = %v ?!?", v)
+	}
+	v, err = performDivision(float64(1.2), float64(1.5))
+	assertNoError(t, err)
+	if v != float64(0.7999999999999999) {
+		t.Errorf("1.2 / 1.5 = %v ?!?", v)
+	}
+	v, err = performDivision(int64(9223372036854775807), int64(2))
+	assertNoError(t, err)
+	if v != int64(4611686018427387903) {
+		t.Errorf("9223372036854775807 / 2 = %v ?!?", v)
+	}
+	_, err = performDivision("abc", int64(1))
+	assertError(t, err)
+	_, err = performDivision(int64(1), "abc")
+	assertError(t, err)
+	_, err = performDivision("abc", "123")
+	assertError(t, err)
+}
+
+func TestPerformRemainder(t *testing.T) {
+	v, err := performRemainder(int64(4), int64(2))
+	assertNoError(t, err)
+	if v != int64(0) {
+		t.Errorf("4 %% 2 = %v ?!?", v)
+	}
+	v, err = performRemainder(int64(5), int64(3))
+	assertNoError(t, err)
+	if v != int64(2) {
+		t.Errorf("5 %% 3 = %v ?!?", v)
+	}
+	v, err = performRemainder(int64(-5), int64(3))
+	assertNoError(t, err)
+	if v != int64(-2) {
+		t.Errorf("-5 %% 3 = %v ?!?", v)
+	}
+	v, err = performRemainder(int64(-5), int64(-3))
+	assertNoError(t, err)
+	if v != int64(-2) {
+		t.Errorf("-5 %% -3 = %v ?!?", v)
+	}
+	v, err = performRemainder(int64(9223372036854775807), int64(2))
+	assertNoError(t, err)
+	if v != int64(1) {
+		t.Errorf("9223372036854775807 %% 2 = %v ?!?", v)
+	}
+	_, err = performRemainder(float64(1.234), int64(4))
+	assertError(t, err)
+	_, err = performRemainder(int64(4), float64(1.234))
+	assertError(t, err)
+	_, err = performRemainder("abc", int64(1))
+	assertError(t, err)
+	_, err = performRemainder(int64(1), "abc")
+	assertError(t, err)
+	_, err = performRemainder("abc", "123")
+	assertError(t, err)
 }

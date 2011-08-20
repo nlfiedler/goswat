@@ -113,3 +113,14 @@ func TestExprBinaryMinus(t *testing.T) {
 	values["1-${foo}"] = "-122"
 	evaluateAndCompare(i, values, t)
 }
+
+func TestExprBinaryMultiply(t *testing.T) {
+	values := make(map[string]string)
+	values["1*1"] = "1"
+	values["10*4"] = "40"
+	values["4*1.234"] = "4.936"
+	i := NewInterpreter()
+	i.SetVariable("foo", "123")
+	values["2*${foo}"] = "246"
+	evaluateAndCompare(i, values, t)
+}

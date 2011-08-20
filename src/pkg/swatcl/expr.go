@@ -445,7 +445,6 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 	p := NewParser(expr)
 	e := newEvaluator(interp)
 
-	// TODO: get the evaluator working for simple operators (+ - / *)
 	// TODO: get the evaluator working with operator precedence (e.g. * before +)
 	// TODO: get the evaluator working for grouped expressions (e.g. (1 + 2) * 3)
 	// TODO: get the evaluator working for variable expressions

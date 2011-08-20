@@ -2,12 +2,8 @@ GoSwat Checklist (-*- text -*-)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - Come up with a name for the project
-  - nswat
-  - GoSwat
-  - Swat
   - Smite
-  - uxiio (anglicized Yiddish for swat)
-  - agyonüt (Hungarian for brain/swat/slay)
+  - GoSwat
 + evaluate the exp/ogle package
   - seems to have all of the basics in place
   - should understand the design and create a new design to address TODO comments

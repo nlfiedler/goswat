@@ -69,7 +69,12 @@ func (o *operatorNode) evaluate() (interface{}, *TclError) {
 	switch o.text {
 	// case "~", "!":
 	// case "**":
-	// case "*", "/", "%":
+	case "%":
+		return o.handleRemainder()
+	case "*":
+		return o.handleMultiply()
+	case "/":
+		return o.handleDivide()
 	case "+":
 		return o.handlePlus()
 	case "-":
@@ -155,4 +160,46 @@ func (o *operatorNode) handleMinus() (interface{}, *TclError) {
 		return performSubtraction(left, right)
 	}
 	panic("unreachable")
+}
+
+// handleMultiply performs the multiplication (*) binary operator.
+func (o *operatorNode) handleMultiply() (interface{}, *TclError) {
+	// evaluate both children, return product
+	left, err := o.left.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	right, err := o.right.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	return performMultiplication(left, right)
+}
+
+// handleDivide performs the division (/) binary operator.
+func (o *operatorNode) handleDivide() (interface{}, *TclError) {
+	// evaluate both children, return quotient
+	left, err := o.left.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	right, err := o.right.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	return performDivision(left, right)
+}
+
+// handleRemainder performs the remainder (/) binary operator.
+func (o *operatorNode) handleRemainder() (interface{}, *TclError) {
+	// evaluate both children, return remainder
+	left, err := o.left.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	right, err := o.right.evaluate()
+	if err != nil {
+		return nil, err
+	}
+	return performRemainder(left, right)
 }
