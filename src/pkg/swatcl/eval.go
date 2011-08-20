@@ -140,11 +140,11 @@ func evalString(expr string) (string, *TclError) {
 	num := 0
 	for _, c := range expr {
 		if unicode > 0 {
-			v  := hexCharToByte(c)
+			v := hexCharToByte(c)
 			if v == -1 {
-				return "", NewTclError(EINVALNUM, "invalid hex character in " + expr)
+				return "", NewTclError(EINVALNUM, "invalid hex character in "+expr)
 			}
-			num = num << 4 + v
+			num = num<<4 + v
 			unicode--
 			if unicode == 0 {
 				buf.WriteRune(num)
@@ -152,11 +152,11 @@ func evalString(expr string) (string, *TclError) {
 			}
 
 		} else if hex > 0 {
-			v  := hexCharToByte(c)
+			v := hexCharToByte(c)
 			if v == -1 {
-				return "", NewTclError(EINVALNUM, "invalid hex character in " + expr)
+				return "", NewTclError(EINVALNUM, "invalid hex character in "+expr)
 			}
-			num = num << 4 + v
+			num = num<<4 + v
 			hex--
 			if hex == 0 {
 				buf.WriteByte(byte(num))
@@ -164,11 +164,11 @@ func evalString(expr string) (string, *TclError) {
 			}
 
 		} else if octal > 0 {
-			v  := octCharToByte(c)
+			v := octCharToByte(c)
 			if v == -1 {
-				return "", NewTclError(EINVALNUM, "invalid octal character in " + expr)
+				return "", NewTclError(EINVALNUM, "invalid octal character in "+expr)
 			}
-			num = num << 3 + v
+			num = num<<3 + v
 			octal--
 			if octal == 0 {
 				buf.WriteByte(byte(num))

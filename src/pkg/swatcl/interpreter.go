@@ -159,17 +159,17 @@ func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
 // registerCoreCommands registers the built-in commands provided by this
 // package so that they may be used by other Tcl scripts.
 func (i *Interpreter) registerCoreCommands() {
-//     int j; char *name[] = {"+","-","*","/",">",">=","<","<=","==","!="};
-//     for (j = 0; j < (int)(sizeof(name)/sizeof(char*)); j++)
-//         picolRegisterCommand(i,name[j],picolCommandMath,NULL);
+	//     int j; char *name[] = {"+","-","*","/",">",">=","<","<=","==","!="};
+	//     for (j = 0; j < (int)(sizeof(name)/sizeof(char*)); j++)
+	//         picolRegisterCommand(i,name[j],picolCommandMath,NULL);
 	i.RegisterCommand("set", commandSet, nil)
 	i.RegisterCommand("puts", commandPuts, nil)
 	i.RegisterCommand("if", commandIf, nil)
-    // picolRegisterCommand(i,"while",picolCommandWhile,NULL);
-    // picolRegisterCommand(i,"break",picolCommandRetCodes,NULL);
-    // picolRegisterCommand(i,"continue",picolCommandRetCodes,NULL);
-    // picolRegisterCommand(i,"proc",picolCommandProc,NULL);
-    // picolRegisterCommand(i,"return",picolCommandReturn,NULL);
+	// picolRegisterCommand(i,"while",picolCommandWhile,NULL);
+	// picolRegisterCommand(i,"break",picolCommandRetCodes,NULL);
+	// picolRegisterCommand(i,"continue",picolCommandRetCodes,NULL);
+	// picolRegisterCommand(i,"proc",picolCommandProc,NULL);
+	// picolRegisterCommand(i,"return",picolCommandReturn,NULL);
 }
 
 // arityError is a convenience method for commands to report an error

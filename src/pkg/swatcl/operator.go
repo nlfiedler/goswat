@@ -14,11 +14,11 @@ import (
 // an arity (e.g. binary, unary) and a precedence.
 type operatorNode struct {
 	exprNode
-	arity      int      // 1 for unary, 2 for binary
+	arity      int       // 1 for unary, 2 for binary
 	left       *exprNode // left child node
 	right      *exprNode // right child node
-	precedence int  // operator precedence (with 1 being the highest)
-	sentinel   bool // true if this is a sentinel node (e.g. left parenthesis)
+	precedence int       // operator precedence (with 1 being the highest)
+	sentinel   bool      // true if this is a sentinel node (e.g. left parenthesis)
 }
 
 // TODO: left paren is an operator node with precedence of 1 and a sentinel flag

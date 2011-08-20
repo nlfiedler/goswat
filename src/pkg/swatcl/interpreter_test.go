@@ -113,7 +113,7 @@ func TestInterpSetVariableNoStack(t *testing.T) {
 	interp := NewInterpreter()
 	interp.popFrame()
 	err := interp.SetVariable("foo", "bar")
-	if err == nil ||  err.Errno != ENOSTACK {
+	if err == nil || err.Errno != ENOSTACK {
 		t.Error("expected no stack error in SetVariable")
 	}
 }
