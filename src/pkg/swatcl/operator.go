@@ -70,15 +70,15 @@ func (o *operatorNode) evaluate() (interface{}, *TclError) {
 	// case "~", "!":
 	// case "**":
 	case "%":
-		return o.handleRemainder()
+		return o.performRemainder()
 	case "*":
-		return o.handleMultiply()
+		return o.performMultiply()
 	case "/":
-		return o.handleDivide()
+		return o.performDivide()
 	case "+":
-		return o.handlePlus()
+		return o.performPlus()
 	case "-":
-		return o.handleMinus()
+		return o.performMinus()
 	// case "<<", ">>":
 	// case "<", ">", "<=", ">=":
 	// case "eq", "ne", "in", "ni":
@@ -94,8 +94,8 @@ func (o *operatorNode) evaluate() (interface{}, *TclError) {
 	return "", nil
 }
 
-// handlePlus performs the plus (+) unary and binary operators.
-func (o *operatorNode) handlePlus() (interface{}, *TclError) {
+// performPlus performs the plus (+) unary and binary operators.
+func (o *operatorNode) performPlus() (interface{}, *TclError) {
 	if o.arity == 1 {
 		// evaluate right child and return 0 + value
 		val, err := o.right.evaluate()
@@ -123,13 +123,29 @@ func (o *operatorNode) handlePlus() (interface{}, *TclError) {
 		if err != nil {
 			return nil, err
 		}
-		return performAddition(left, right)
+		if left == nil || right == nil {
+			return nil, NewTclError(EOPERAND, "cannot operate on nil")
+		}
+		lf, lf_ok := left.(float64)
+		rf, rf_ok := right.(float64)
+		li, li_ok := left.(int64)
+		ri, ri_ok := right.(int64)
+		if lf_ok && rf_ok {
+			return lf + rf, nil
+		} else if lf_ok && ri_ok {
+			return lf + float64(ri), nil
+		} else if li_ok && rf_ok {
+			return float64(li) + rf, nil
+		} else if li_ok && ri_ok {
+			return li + ri, nil
+		}
+		return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
 	}
 	panic("unreachable")
 }
 
-// handleMinus performs the minus (-) unary and binary operators.
-func (o *operatorNode) handleMinus() (interface{}, *TclError) {
+// performMinus performs the minus (-) unary and binary operators.
+func (o *operatorNode) performMinus() (interface{}, *TclError) {
 	if o.arity == 1 {
 		// evaluate right child and return 0 - value
 		val, err := o.right.evaluate()
@@ -157,13 +173,29 @@ func (o *operatorNode) handleMinus() (interface{}, *TclError) {
 		if err != nil {
 			return nil, err
 		}
-		return performSubtraction(left, right)
+		if left == nil || right == nil {
+			return nil, NewTclError(EOPERAND, "cannot operate on nil")
+		}
+		lf, lf_ok := left.(float64)
+		rf, rf_ok := right.(float64)
+		li, li_ok := left.(int64)
+		ri, ri_ok := right.(int64)
+		if lf_ok && rf_ok {
+			return lf - rf, nil
+		} else if lf_ok && ri_ok {
+			return lf - float64(ri), nil
+		} else if li_ok && rf_ok {
+			return float64(li) - rf, nil
+		} else if li_ok && ri_ok {
+			return li - ri, nil
+		}
+		return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
 	}
 	panic("unreachable")
 }
 
-// handleMultiply performs the multiplication (*) binary operator.
-func (o *operatorNode) handleMultiply() (interface{}, *TclError) {
+// performMultiply performs the multiplication (*) binary operator.
+func (o *operatorNode) performMultiply() (interface{}, *TclError) {
 	// evaluate both children, return product
 	left, err := o.left.evaluate()
 	if err != nil {
@@ -173,11 +205,27 @@ func (o *operatorNode) handleMultiply() (interface{}, *TclError) {
 	if err != nil {
 		return nil, err
 	}
-	return performMultiplication(left, right)
+	if left == nil || right == nil {
+		return nil, NewTclError(EOPERAND, "cannot operate on nil")
+	}
+	lf, lf_ok := left.(float64)
+	rf, rf_ok := right.(float64)
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if lf_ok && rf_ok {
+		return lf * rf, nil
+	} else if lf_ok && ri_ok {
+		return lf * float64(ri), nil
+	} else if li_ok && rf_ok {
+		return float64(li) * rf, nil
+	} else if li_ok && ri_ok {
+		return li * ri, nil
+	}
+	return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
 }
 
-// handleDivide performs the division (/) binary operator.
-func (o *operatorNode) handleDivide() (interface{}, *TclError) {
+// performDivide performs the division (/) binary operator.
+func (o *operatorNode) performDivide() (interface{}, *TclError) {
 	// evaluate both children, return quotient
 	left, err := o.left.evaluate()
 	if err != nil {
@@ -187,11 +235,27 @@ func (o *operatorNode) handleDivide() (interface{}, *TclError) {
 	if err != nil {
 		return nil, err
 	}
-	return performDivision(left, right)
+	if left == nil || right == nil {
+		return nil, NewTclError(EOPERAND, "cannot operate on nil")
+	}
+	lf, lf_ok := left.(float64)
+	rf, rf_ok := right.(float64)
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if lf_ok && rf_ok {
+		return lf / rf, nil
+	} else if lf_ok && ri_ok {
+		return lf / float64(ri), nil
+	} else if li_ok && rf_ok {
+		return float64(li) / rf, nil
+	} else if li_ok && ri_ok {
+		return li / ri, nil
+	}
+	return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
 }
 
-// handleRemainder performs the remainder (/) binary operator.
-func (o *operatorNode) handleRemainder() (interface{}, *TclError) {
+// performRemainder performs the remainder (/) binary operator.
+func (o *operatorNode) performRemainder() (interface{}, *TclError) {
 	// evaluate both children, return remainder
 	left, err := o.left.evaluate()
 	if err != nil {
@@ -201,5 +265,13 @@ func (o *operatorNode) handleRemainder() (interface{}, *TclError) {
 	if err != nil {
 		return nil, err
 	}
-	return performRemainder(left, right)
+	if left == nil || right == nil {
+		return nil, NewTclError(EOPERAND, "cannot operate on nil")
+	}
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if li_ok && ri_ok {
+		return li % ri, nil
+	}
+	return nil, NewTclError(EOPERAND, "cannot operate on non-integer values")
 }
