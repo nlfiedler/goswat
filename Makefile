@@ -13,6 +13,7 @@ include $(GOROOT)/src/Make.inc
 #	src/cmd/bench
 
 PKGS=\
+	src/pkg/container/vector\
 	src/pkg/swatcl
 
 all: make

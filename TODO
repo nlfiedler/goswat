@@ -4,6 +4,9 @@ GoSwat Checklist (-*- text -*-)
 - Come up with a name for the project
   - Smite
   - GoSwat
+- Write a basic Tcl interpreter based on the picol example
+  - When it can execute basic Tcl scripts, set up the project on Google Code
+- Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
 + evaluate the exp/ogle package
   - seems to have all of the basics in place
   - should understand the design and create a new design to address TODO comments
@@ -16,11 +19,10 @@ GoSwat Checklist (-*- text -*-)
     - processes
     - threads
     - registers
-- Write a basic Tcl interpreter based on the picol example
-  - When it can execute basic Tcl scripts, set up the project on Google Code
-- Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
-- Utilize termbox (https://github.com/nsf/termbox) or gocurse (https://github.com/jabb/gocurse)
-  to facilitate a psuedo GUI in the console
+- Utilize one of the following to facilitate a psuedo GUI in the console
+  - https://github.com/nsf/termbox
+  - https://github.com/jabb/gocurse
+  - http://code.google.com/p/goncurses/
 - Features
   - Breakpoint tags vs. groups
   - Built-in functions not overridable
