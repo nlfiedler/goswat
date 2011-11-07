@@ -58,13 +58,13 @@ func commandSet(i *Interpreter, argv []string, data []string) (parserState, stri
 	if len(argv) == 3 {
 		err := i.SetVariable(argv[1], argv[2])
 		if err != nil {
-			return stateError, err.Error.String()
+			return stateError, err.Error()
 		}
 		return stateOK, argv[2]
 	} else {
 		val, err := i.GetVariable(argv[1])
 		if err != nil {
-			return stateError, err.Error.String()
+			return stateError, err.Error()
 		}
 		return stateOK, val
 	}

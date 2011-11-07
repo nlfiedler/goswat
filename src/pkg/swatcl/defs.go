@@ -102,18 +102,24 @@ const (
 )
 
 // TclError is used to provide information on the type of error that
-// occurred while parsing or evaluating the Tcl script.
+// occurred while parsing or evaluating the Tcl script. It implements
+// the error interface.
 type TclError struct {
-	Errno os.Errno
-	Error os.Error
+	Errno   os.Errno
+	Message string
 }
 
 // NewTclError creates a new TclError based on the given values.
 func NewTclError(err int, msg string) *TclError {
-	return &TclError{os.Errno(err), os.NewError(msg)}
+	return &TclError{os.Errno(err), msg}
 }
 
 // String returns the string representation of the error.
 func (e *TclError) String() string {
-	return e.Error.String()
+	return e.Message
+}
+
+// Error returns the string representation of the error.
+func (e *TclError) Error() string {
+	return e.Message
 }
