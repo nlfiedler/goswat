@@ -9,7 +9,7 @@
 package swatcl
 
 import (
-	"os"
+	"syscall"
 )
 
 type parserState int
@@ -105,13 +105,13 @@ const (
 // occurred while parsing or evaluating the Tcl script. It implements
 // the error interface.
 type TclError struct {
-	Errno   os.Errno
+	Errno   syscall.Errno
 	Message string
 }
 
 // NewTclError creates a new TclError based on the given values.
 func NewTclError(err int, msg string) *TclError {
-	return &TclError{os.Errno(err), msg}
+	return &TclError{syscall.Errno(err), msg}
 }
 
 // String returns the string representation of the error.
