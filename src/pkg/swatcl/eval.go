@@ -45,7 +45,7 @@ func coerceNumber(expr string) (interface{}, *TclError) {
 // atof attempts to coerce the given text into a floating point value,
 // returning an error if unsuccessful.
 func atof(text string) (interface{}, *TclError) {
-	v, err := strconv.Atof64(text)
+	v, err := strconv.ParseFloat(text, 64)
 	if err != nil {
 		if err == os.EINVAL {
 			// the parser messed up if this happens
@@ -63,7 +63,7 @@ func atof(text string) (interface{}, *TclError) {
 func atoi(text string) (interface{}, *TclError) {
 	// let strconv detect the number base for us
 	// (either binary, decimal, or hexadecimal)
-	v, err := strconv.Btoi64(text, 0)
+	v, err := strconv.ParseInt(text, 0, 64)
 	if err != nil {
 		if err == os.EINVAL {
 			// the parser messed up if this happens
