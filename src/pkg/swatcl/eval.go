@@ -14,7 +14,7 @@ import (
 )
 
 // escapes maps an escape code to the matching character literal.
-var escapes = map[int]string{'a': "\a", 'b': "\b", 'f': "\f", 'n': "\n", 'r': "\r", 't': "\t", 'v': "\v"}
+var escapes = map[rune]string{'a': "\a", 'b': "\b", 'f': "\f", 'n': "\n", 'r': "\r", 't': "\t", 'v': "\v"}
 
 // coerceNumber attempts to parse the given expression as either
 // an integer or floating point number. Failing that, it returns
@@ -98,7 +98,7 @@ func evalBoolean(expr string) (bool, *TclError) {
 // hexCharToByte converts the given character to a byte value, where the
 // character represents a hexadecimal digit (0..9, a..f, A..F). Returns
 // -1 if the character is not a valid hex digit.
-func hexCharToByte(r int) int {
+func hexCharToByte(r rune) rune {
 	if r >= '0' && r <= '9' {
 		return r - '0'
 	} else if r >= 'a' && r <= 'f' {
@@ -114,7 +114,7 @@ func hexCharToByte(r int) int {
 // octCharToByte converts the given character to a byte value, where the
 // character represents an octal digit (0..7). Returns -1 if the
 // character is not a valid hex digit.
-func octCharToByte(r int) int {
+func octCharToByte(r rune) rune {
 	if r >= '0' && r <= '7' {
 		return r - '0'
 	} else {
@@ -137,7 +137,7 @@ func evalString(expr string) (string, *TclError) {
 	unicode := 0
 	hex := 0
 	octal := 0
-	num := 0
+	var num int32 = 0
 	for _, c := range expr {
 		if unicode > 0 {
 			v := hexCharToByte(c)
