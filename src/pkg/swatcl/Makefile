@@ -13,6 +13,7 @@ GOFILES=\
 	eval.go\
 	expr.go\
 	interpreter.go\
+	lexer.go\
 	parser.go\
 	operator.go\
 

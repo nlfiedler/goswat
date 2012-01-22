@@ -10,6 +10,34 @@ import (
 	"fmt"
 )
 
+// callFrame is a frame within the call stack of the Tcl interpreter.
+type callFrame struct {
+	vars map[string]string
+}
+
+// commandFunc is a function that implements a built-in command. The
+// argv parameter provides the incoming arguments, with the first entry
+// being the name of the command being invoked. The data parameter is
+// that which was passed to the RegisterCommand method of Interpreter.
+// The function returns the parser state and the result of the command.
+type commandFunc func(i *Interpreter, argv []string, data []string) (parserState, string)
+
+// swatclCmd represents a built-in command.
+type swatclCmd struct {
+	function commandFunc // the command function
+	privdata []string    // private data given at time of registration
+}
+
+// Interpreter contains the internal state of the Tcl interpreter,
+// including register commands, the call frame, and result of the
+// interpretation.
+type Interpreter struct {
+	level    int                  // level of nesting
+	frames   []callFrame          // call stack frames
+	commands map[string]swatclCmd // registered commands
+	result   string               // result of evaluation
+}
+
 // NewInterpreter creates a new instance of Interpreter.
 func NewInterpreter() *Interpreter {
 	i := new(Interpreter)
@@ -97,6 +125,11 @@ func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
 	argv := make([]string, 0)
 	p := NewParser(tcl)
 
+	// TODO: with the new lexer, interpreter will need to keep track of open quotes
+	//       in order to know whether to append latest token to previous or add as
+	//       a new argument to the current command
+
+	// TODO: handle escaped newline at end of string (inside both " and {, converts to space)
 	for {
 		prevtoken := p.token
 		p.parseToken()

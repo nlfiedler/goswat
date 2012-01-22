@@ -27,6 +27,14 @@ import (
 	"fmt"
 )
 
+//
+// TODO: write a lexer for Tcl expressions, similar to lexer.go, using
+// the parseExprToken as an example of what to do, and replace the
+// searchState below with lexer state functions; could reuse the lexer
+// in lexer.go if we can provide our own initial state function in the
+// call to the lex() function
+//
+
 // TODO: support variable references in expressions
 
 // TODO: support command invocations in expressions
@@ -54,6 +62,7 @@ const (
 	searchOperator // expecting an operator
 )
 
+// Evaluator knows how to evaluate a Tcl expression.
 type Evaluator interface {
 	evaluate() (interface{}, *TclError)
 }
@@ -120,9 +129,10 @@ type evaluator struct {
 }
 
 func newEvaluator(interp *Interpreter) *evaluator {
-	e := &evaluator{}
-	e.state = searchArgument
-	e.interp = interp
+	e := &evaluator{
+		state: searchArgument,
+		interp: interp,
+	}
 	return e
 }
 

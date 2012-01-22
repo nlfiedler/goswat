@@ -11,35 +11,36 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // escapes maps an escape code to the matching character literal.
 var escapes = map[rune]string{'a': "\a", 'b': "\b", 'f': "\f", 'n': "\n", 'r': "\r", 't': "\t", 'v': "\v"}
 
+// isAlphaNumeric indicates if the given rune is a letter or number.
+func isAlphaNumeric(r rune) bool {
+	return unicode.IsDigit(r) || unicode.IsLetter(r)
+}
+
 // coerceNumber attempts to parse the given expression as either
 // an integer or floating point number. Failing that, it returns
 // the input as given. Leading plus and minus signs are honored.
 func coerceNumber(expr string) (interface{}, *TclError) {
+	// prepare the expression to be lexed
 	pe := expr
 	if len(expr) > 1 && (expr[0] == '-' || expr[0] == '+') {
 		pe = expr[1:]
 	}
-	p := NewParser(pe)
-	state, _ := p.parseNumber()
-	if state != stateOK {
-		// it was not a number
+	_, c := lexExpr("expr", pe)
+	token := <-c
+	if token.typ == tokenFloat {
+		return atof(expr)
+	} else if token.typ == tokenInteger {
+		return atoi(expr)
+	} else {
 		return expr, nil
 	}
-	switch p.token {
-	case tokenInteger:
-		return atoi(expr)
-	case tokenFloat:
-		return atof(expr)
-	default:
-		// parser made a mistake
-		return "", NewTclError(EINVALNUM, expr)
-	}
-	panic("unreachable")
+	panic("unreachable code")
 }
 
 // atof attempts to coerce the given text into a floating point value,
@@ -184,6 +185,7 @@ func evalString(expr string) (string, *TclError) {
 			case '0':
 				octal = 2
 			default:
+				// TODO: does this handle \\, which is a literal \?
 				if v, ok := escapes[c]; ok {
 					buf.WriteByte(v[0])
 				}

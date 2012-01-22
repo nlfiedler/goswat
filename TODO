@@ -1,10 +1,8 @@
 GoSwat Checklist (-*- text -*-)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Come up with a name for the project
-  - Smite
-  - GoSwat
 - Write a basic Tcl interpreter based on the picol example
+  - Rewrite the lexer and parser in the way described by Rob Pike for the Go template package
   - When it can execute basic Tcl scripts, set up the project on Google Code
 - Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
 + evaluate the exp/ogle package
