@@ -15,7 +15,7 @@ import (
 )
 
 // escapes maps an escape code to the matching character literal.
-var escapes = map[rune]string{'a': "\a", 'b': "\b", 'f': "\f", 'n': "\n", 'r': "\r", 't': "\t", 'v': "\v"}
+var escapes = map[rune]string{'a': "\a", 'b': "\b", 'f': "\f", 'n': "\n", 'r': "\r", 't': "\t", 'v': "\v", '\\': "\\"}
 
 // isAlphaNumeric indicates if the given rune is a letter or number.
 func isAlphaNumeric(r rune) bool {
@@ -185,7 +185,6 @@ func evalString(expr string) (string, *TclError) {
 			case '0':
 				octal = 2
 			default:
-				// TODO: does this handle \\, which is a literal \?
 				if v, ok := escapes[c]; ok {
 					buf.WriteByte(v[0])
 				}

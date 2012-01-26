@@ -66,11 +66,3 @@ func TestExprString(t *testing.T) {
 	values["{foo\\nbar}"] = "foo\\nbar"
 	evaluateAndCompare(i, values, t)
 }
-
-// TODO: enable this test and debug the 'foo' infinite loop issue
-// func TestInvalidSyntax(t *testing.T) {
-// 	i := NewInterpreter()
-// 	values := make(map[string]string)
-// 	values["'foo' + 1"] = "error"
-// 	evaluateAndCompare(i, values, t)
-// }

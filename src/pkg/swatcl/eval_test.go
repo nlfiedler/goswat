@@ -73,6 +73,7 @@ func TestEvalString(t *testing.T) {
 	values["abc\\rdef"] = "abc\rdef"
 	values["abc\\tdef"] = "abc\tdef"
 	values["abc\\vdef"] = "abc\vdef"
+	values["foo\\\\bar"] = "foo\\bar"
 	values["foo\\u005cbar"] = "foo\\bar"
 	values["foo\\x5cbar"] = "foo\\bar"
 	values["foo\\043bar"] = "foo#bar"

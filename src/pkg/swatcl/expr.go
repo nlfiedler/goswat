@@ -27,16 +27,6 @@ import (
 	"fmt"
 )
 
-//
-// TODO: write a lexer for Tcl expressions, similar to lexer.go, using
-// the parseExprToken as an example of what to do, and replace the
-// searchState below with lexer state functions; could reuse the lexer
-// in lexer.go if we can provide our own initial state function in the
-// call to the lex() function
-//
-
-// TODO: support variable references in expressions
-
 // TODO: support command invocations in expressions
 
 // TODO: support following math functions
@@ -457,21 +447,23 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 
 	// TODO: get the evaluator working with operator precedence (e.g. * before +)
 	// TODO: get the evaluator working for grouped expressions (e.g. (1 + 2) * 3)
-	// TODO: get the evaluator working for variable expressions
 	// TODO: get the evaluator working for nested commands
 	// TODO: get the evaluator working for function invocation
 
 	for {
 		// pull tokens from lexer, building expression tree
 		token := <-c
-		if token.typ == tokenEOF {
+		if token.typ == tokenError {
+			return "", NewTclError(ELEXER, token.val)
+
+		} else if token.typ == tokenEOF {
 			err := e.handleEOF()
 			if err != nil {
 				return "", err
 			}
 			break
-		}
-		if token.typ == tokenVariable || token.typ == tokenCommand ||
+
+		} else if token.typ == tokenVariable || token.typ == tokenCommand ||
 			token.typ == tokenInteger || token.typ == tokenFloat ||
 			token.typ == tokenString || token.typ == tokenBrace ||
 			token.typ == tokenQuote {

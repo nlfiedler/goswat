@@ -34,6 +34,7 @@ func TestExprBinaryPlus(t *testing.T) {
 	values["9223372036854775807 + 1"] = "-9223372036854775808"
 	i.SetVariable("foo", "123")
 	values["1 + ${foo}"] = "124"
+	values["'foo' + 1"] = "error"
 	values["\"foo\" + 1"] = "error"
 	values["1 + \"foo\""] = "error"
 	values["\"foo\" + \"bar\""] = "error"
