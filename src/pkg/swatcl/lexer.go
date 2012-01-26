@@ -28,7 +28,6 @@ const eof = unicode.UpperLower
 const (
 	_             tokenType = iota // error occurred
 	tokenError                     // error occurred
-	tokenEscape                    // escape token
 	tokenString                    // string token
 	tokenQuote                     // quoted string token
 	tokenBrace                     // uninterpreted string token
@@ -262,7 +261,7 @@ func lexQuotes(l *lexer) stateFn {
 		r := l.next()
 		switch r {
 		case eof:
-			return l.errorf("unclosed quoted string", l.input[l.start:l.pos])
+			return l.errorf("unclosed quoted string: %q", l.input[l.start:l.pos])
 		case '\\':
 			// pass over escaped characters
 			l.next()
@@ -332,7 +331,7 @@ func lexBrace(l *lexer) stateFn {
 		r := l.next()
 		switch r {
 		case eof:
-			return l.errorf("unclosed left brace", l.input[l.start:l.pos])
+			return l.errorf("unclosed left brace: %q", l.input[l.start:l.pos])
 		case '\\':
 			// pass over escaped characters
 			l.next()
@@ -382,7 +381,7 @@ func lexCommand(l *lexer) stateFn {
 	for {
 		r := l.next()
 		if r == eof {
-			return l.errorf("unclosed command", l.input[l.start:l.pos])
+			return l.errorf("unclosed command: %q", l.input[l.start:l.pos])
 		} else if r == '[' && blevel == 0 {
 			level++
 		} else if r == ']' && blevel == 0 {
@@ -421,7 +420,7 @@ func lexVariable(l *lexer) stateFn {
 	}
 	if braced {
 		if r != '}' {
-			return l.errorf("unclosed variable reference", l.input[l.start:l.pos])
+			return l.errorf("unclosed variable reference: %q", l.input[l.start:l.pos])
 		}
 	} else {
 		l.backup()
@@ -554,7 +553,7 @@ func lexFunction(l *lexer) stateFn {
 	}
 	// next character must be an open parenthesis
 	if r != '(' {
-		return l.errorf("apparent function call missing (")
+		return l.errorf("apparent function call missing (: %q", l.input[l.start:l.pos])
 	}
 	l.emit(tokenFunction)
 	return l.state

@@ -351,7 +351,7 @@ func TestLexerFunctions(t *testing.T) {
 	expected = append(expected, expectedResult{tokenComma, ","})
 	expected = append(expected, expectedResult{tokenInteger, "2"})
 	expected = append(expected, expectedResult{tokenParen, ")"})
-	expected = append(expected, expectedResult{tokenError, "apparent function call missing ("})
+	expected = append(expected, expectedResult{tokenError, "apparent function call missing (: \"foo\""})
 	verifyLexerExprResults(t, input, expected)
 }
 
