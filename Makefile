@@ -14,6 +14,7 @@ include $(GOROOT)/src/Make.inc
 
 PKGS=\
 	src/pkg/container/vector\
+	src/pkg/liswat\
 	src/pkg/swatcl
 
 all: make
