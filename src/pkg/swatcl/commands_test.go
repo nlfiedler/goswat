@@ -16,12 +16,9 @@ import (
 
 func TestCommandSet(t *testing.T) {
 	interp := NewInterpreter()
-	state, err := interp.Evaluate("set foo bar")
+	err := interp.Evaluate("set foo bar")
 	if err != nil {
 		t.Error("failed to invoke command set")
-	}
-	if state != stateOK {
-		t.Error("command set failed to return stateOK")
 	}
 	if interp.result != "bar" {
 		t.Error("set failed to affect result of interpreter")
@@ -37,11 +34,11 @@ func TestCommandSet(t *testing.T) {
 
 func TestCommandSet1Undef(t *testing.T) {
 	interp := NewInterpreter()
-	state, _ := interp.Evaluate("set foo")
-	if state != stateError {
+	err := interp.Evaluate("set foo")
+	if err == nil {
 		t.Error("expected error state")
 	}
-	if interp.result != "Variable 'foo' undefined" {
+	if err.String() != "Variable 'foo' undefined" {
 		t.Error("expected undefined variable error")
 	}
 }
@@ -49,12 +46,9 @@ func TestCommandSet1Undef(t *testing.T) {
 func TestCommandSet1(t *testing.T) {
 	interp := NewInterpreter()
 	err := interp.SetVariable("foo", "bar")
-	state, err := interp.Evaluate("set foo")
+	err = interp.Evaluate("set foo")
 	if err != nil {
 		t.Error("failed to get variable")
-	}
-	if state != stateOK {
-		t.Error("command set failed to return stateOK")
 	}
 	if interp.result != "bar" {
 		t.Error("set failed to affect result of interpreter")
@@ -71,11 +65,11 @@ func TestCommandSet1(t *testing.T) {
 func TestCommandSetNoFrame(t *testing.T) {
 	interp := NewInterpreter()
 	interp.popFrame()
-	state, _ := interp.Evaluate("set foo bar")
-	if state != stateError {
+	err := interp.Evaluate("set foo bar")
+	if err == nil {
 		t.Error("expected error state")
 	}
-	if interp.result != "Empty call stack, cannot set 'foo'" {
+	if err.String() != "Empty call stack, cannot set 'foo'" {
 		t.Error("expected empty stack error")
 	}
 }
@@ -83,11 +77,11 @@ func TestCommandSetNoFrame(t *testing.T) {
 func TestCommandSet1NoFrame(t *testing.T) {
 	interp := NewInterpreter()
 	interp.popFrame()
-	state, _ := interp.Evaluate("set foo")
-	if state != stateError {
+	err := interp.Evaluate("set foo")
+	if err == nil {
 		t.Error("expected error state")
 	}
-	if interp.result != "Empty call stack, cannot get 'foo'" {
+	if err.String() != "Empty call stack, cannot get 'foo'" {
 		t.Error("expected empty stack error")
 	}
 }

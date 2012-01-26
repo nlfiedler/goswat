@@ -19,8 +19,8 @@ type callFrame struct {
 // argv parameter provides the incoming arguments, with the first entry
 // being the name of the command being invoked. The data parameter is
 // that which was passed to the RegisterCommand method of Interpreter.
-// The function returns the parser state and the result of the command.
-type commandFunc func(i *Interpreter, argv []string, data []string) (parserState, string)
+// The function returns the result of the command and any error.
+type commandFunc func(i *Interpreter, argv []string, data []string) (string, *TclError)
 
 // swatclCmd represents a built-in command.
 type swatclCmd struct {
@@ -91,102 +91,96 @@ func (i *Interpreter) SetVariable(name, value string) *TclError {
 
 // RegisterCommand adds the named command function to the interpreter so
 // it may be invoked at a later time.
-func (i *Interpreter) RegisterCommand(name string, f commandFunc, privdata []string) (parserState, *TclError) {
+func (i *Interpreter) RegisterCommand(name string, f commandFunc, privdata []string) *TclError {
 	_, ok := i.commands[name]
 	if ok {
 		i.result = fmt.Sprintf("Command '%s' already defined", name)
-		return stateError, NewTclError(ECMDDEF, i.result)
+		return NewTclError(ECMDDEF, i.result)
 	}
 	cmd := swatclCmd{f, privdata}
 	i.commands[name] = cmd
-	return stateOK, nil
+	return nil
 }
 
 // InvokeCommand will call the named command, passing the given arguments.
-func (i *Interpreter) InvokeCommand(argv []string) (parserState, *TclError) {
+func (i *Interpreter) InvokeCommand(argv []string) *TclError {
 	if len(argv) < 1 {
 		i.result = "InvokeCommand called without arguments"
-		return stateError, NewTclError(EILLARG, i.result)
+		return NewTclError(EILLARG, i.result)
 	}
 	name := argv[0]
 	c, ok := i.commands[name]
 	if !ok {
 		i.result = fmt.Sprintf("No such command '%s'", name)
-		return stateError, NewTclError(ECMDUNDEF, i.result)
+		return NewTclError(ECMDUNDEF, i.result)
 	}
-	s, r := c.function(i, argv, c.privdata)
-	i.result = r
-	return s, nil
+	str, err := c.function(i, argv, c.privdata)
+	i.result = str
+	return err
 }
 
 // Evaluate interprets the given Tcl text.
-func (i *Interpreter) Evaluate(tcl string) (parserState, *TclError) {
+func (i *Interpreter) Evaluate(tcl string) *TclError {
 	// command and arguments to be invoked
 	argv := make([]string, 0)
-	p := NewParser(tcl)
-
-	// TODO: with the new lexer, interpreter will need to keep track of open quotes
-	//       in order to know whether to append latest token to previous or add as
-	//       a new argument to the current command
+	c := lex("Evaluate", tcl)
 
 	// TODO: handle escaped newline at end of string (inside both " and {, converts to space)
+	inquotes := false
 	for {
-		prevtoken := p.token
-		p.parseToken()
-		if p.token == tokenEOF {
-			break
+		token, ok := <-c
+		if !ok {
+			return NewTclError(ELEXER, "unexpected end of lexer stream")
 		}
-		t := p.GetTokenText()
-		if p.token == tokenVariable {
+		t := token.contents()
+		switch token.typ {
+		case tokenError:
+			return NewTclError(ELEXER, token.val)
+		case tokenEOL, tokenEOF:
+			if len(argv) > 0 {
+				// Parsing complete, invoke the command.
+				err := i.InvokeCommand(argv)
+				if err != nil {
+					return err
+				} else if token.typ == tokenEOF {
+					return nil
+				}
+				argv = make([]string, 0)
+			}
+
+		case tokenVariable:
 			// Get variable value
 			v, err := i.GetVariable(t)
 			if err != nil {
 				i.result = fmt.Sprintf("No such variable '%s'", t)
-				return stateError, err
+				return err
 			}
 			t = v
 
-		} else if p.token == tokenCommand {
+		case tokenCommand:
 			// Evaluate command invocation
-			retcode, err := i.Evaluate(t)
-			if retcode != stateOK {
-				return retcode, err
+			err := i.Evaluate(t)
+			if err != nil {
+				return err
 			}
 			t = i.result
 
-		} else if p.token == tokenEscape {
-			// TODO: handle variable reference or command invocation
-			// TODO: need to save parser state...
-			// TODO: evaluate variable/command...
-			// TODO: append result to existing string...
-			// TODO: continue parsing as string
-
-		} else if p.token == tokenSeparator {
-			// Not finished parsing, continue
-			continue
-		}
-
-		if p.token == tokenEOL {
-			if len(argv) > 0 {
-				// Parsing complete, invoke the command.
-				retcode, err := i.InvokeCommand(argv)
-				if retcode != stateOK {
-					return retcode, err
-				}
+		case tokenQuote:
+			qb, qe := token.quotes()
+			if qb != qe {
+				inquotes = !inquotes
 			}
-			continue
 		}
 
 		// We have a new token, append to the previous or as new arg?
-		if prevtoken == tokenSeparator || prevtoken == tokenEOL {
-			argv = append(argv, t)
-		} else {
-			// interpolation
+		if inquotes {
 			last := len(argv) - 1
 			argv[last] = argv[last] + t
+		} else {
+			argv = append(argv, t)
 		}
 	}
-	return stateOK, nil
+	return nil
 }
 
 // registerCoreCommands registers the built-in commands provided by this
@@ -207,7 +201,6 @@ func (i *Interpreter) registerCoreCommands() {
 
 // arityError is a convenience method for commands to report an error
 // with the number of arguments given to the command.
-func (i *Interpreter) arityError(name string) parserState {
-	i.result = fmt.Sprintf("Wrong number of arguments for %s", name)
-	return stateError
+func (i *Interpreter) arityError(name string) *TclError {
+	return NewTclError(ECOMMAND, "Wrong number of arguments for "+name)
 }

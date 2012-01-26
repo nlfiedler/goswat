@@ -19,38 +19,39 @@ import (
 )
 
 // tokenType is the type of a lexer token (e.g. string, number).
-type tokenType parserToken // TODO: later change to 'int'
+type tokenType int
 
 // eof marks the end of the input text.
 const eof = unicode.UpperLower
 
-// TODO: when lexer replaces parser, uncomment these constants
-// const (
-// 	tokenError     tokenType = iota // error occurred
-// 	tokenEscape                    // escape token
-// 	tokenString                    // string token
-//	tokenQuoted    // quoted string token
-// 	tokenBrace                     // uninterpreted string token
-// 	tokenCommand                   // command token
-// 	tokenVariable                  // variable token
-// 	tokenFunction                  // expression function call
-// 	tokenOperator                  // expression operator
-// 	tokenInteger                   // integer literal
-// 	tokenFloat                     // floating point literal
-// 	tokenComma                     // comma (argument separator)
-// 	tokenParen                     // open/close parenthesis
-// 	tokenEOL                       // end-of-line token
-// 	tokenEOF                       // end-of-file token
-// )
+// token types
+const (
+	_             tokenType = iota // error occurred
+	tokenError                     // error occurred
+	tokenEscape                    // escape token
+	tokenString                    // string token
+	tokenQuote                     // quoted string token
+	tokenBrace                     // uninterpreted string token
+	tokenCommand                   // command token
+	tokenVariable                  // variable token
+	tokenFunction                  // expression function call
+	tokenOperator                  // expression operator
+	tokenInteger                   // integer literal
+	tokenFloat                     // floating point literal
+	tokenComma                     // comma (argument separator)
+	tokenParen                     // open/close parenthesis
+	tokenEOL                       // end-of-line token
+	tokenEOF                       // end-of-file token
+)
 
 // token represents a token returned from the scanner.
 type token struct {
 	typ tokenType // Type, such as tokenNumber.
-	val string   // Value, such as "23.2".
+	val string    // Value, such as "23.2".
 }
 
 // String returns the string representation of the lexer token.
-func (t token) String() string {
+func (t *token) String() string {
 	switch t.typ {
 	case tokenEOF:
 		return "EOF"
@@ -63,14 +64,65 @@ func (t token) String() string {
 	return fmt.Sprintf("%q", t.val)
 }
 
+// quotes indicates whether the token value starts and ends with double
+// quotes ("). The first boolean return value is true if the token value
+// starts with ", while the second return value is true if the token
+// value ends with ". If the token value is a single character, the
+// second return value is always false. If the token is not a quoted
+// token, the return values will be false, false.
+func (t *token) quotes() (bool, bool) {
+	if t.typ == tokenQuote && len(t.val) > 0 {
+		l := len(t.val)
+		if l == 1 {
+			return t.val[0] == '"', false
+		} else {
+			return t.val[0] == '"', t.val[l-1] == '"'
+		}
+	} else {
+		return false, false
+	}
+	panic("unreachable code")
+}
+
+// contents returns the unique portion of the token text, minus any
+// markers such as braces or brackets. For tokenEOF this will return
+// nil.
+func (t *token) contents() string {
+	switch t.typ {
+	case tokenBrace, tokenCommand:
+		return t.val[1 : len(t.val)-1]
+	case tokenQuote:
+		qb, qe := t.quotes()
+		l := len(t.val)
+		if qb {
+			if qe {
+				return t.val[1 : l-1]
+			}
+			return t.val[1:]
+		} else if qe {
+			return t.val[:l-1]
+		}
+		return t.val
+	case tokenVariable:
+		if t.val[1] == '{' {
+			l := len(t.val)
+			return t.val[2 : l-1]
+		}
+		return t.val[1:]
+	default:
+		return t.val
+	}
+	panic("unreachable code")
+}
+
 // lexer holds the state of the scanner.
 type lexer struct {
-	name  string    // used only for error reports.
-	input string    // the string being scanned.
-	start int       // start position of this token.
-	pos   int       // current position in the input.
-	width int       // width of last rune read from input.
-	state stateFn   // starting state, others states should return here
+	name   string     // used only for error reports.
+	input  string     // the string being scanned.
+	start  int        // start position of this token.
+	pos    int        // current position in the input.
+	width  int        // width of last rune read from input.
+	state  stateFn    // starting state, others states should return here
 	tokens chan token // channel of scanned tokens.
 }
 
@@ -79,31 +131,29 @@ type lexer struct {
 type stateFn func(*lexer) stateFn
 
 // lex initializes the lexer to lex the given Tcl command text,
-// returning the new lexer and the channel from which tokens are
-// received.
-func lex(name, input string) (*lexer, chan token) {
+// returning the channel from which tokens are received.
+func lex(name, input string) chan token {
 	l := &lexer{
-		name: name,
-		input: input,
+		name:   name,
+		input:  input,
 		tokens: make(chan token),
-		state: lexStart,
+		state:  lexStart,
 	}
 	go l.run() // Concurrently run state machine.
-	return l, l.tokens
+	return l.tokens
 }
 
 // lexExpr initializes the lexer to lex the given Tcl expression,
-// returning the new lexer and the channel from which tokens are
-// received.
-func lexExpr(name, input string) (*lexer, chan token) {
+// returning the channel from which tokens are received.
+func lexExpr(name, input string) chan token {
 	l := &lexer{
-		name: name,
-		input: input,
+		name:   name,
+		input:  input,
 		tokens: make(chan token),
-		state: lexExprStart,
+		state:  lexExprStart,
 	}
 	go l.run() // Concurrently run state machine.
-	return l, l.tokens
+	return l.tokens
 }
 
 // run lexes the input by executing state functions until the state is
@@ -172,7 +222,7 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 		tokenError,
 		fmt.Sprintf(format, args...),
 	}
-	return nil
+	return l.state
 }
 
 // lexStart reads the next token from the input and determines
@@ -218,17 +268,17 @@ func lexQuotes(l *lexer) stateFn {
 			l.next()
 		case '$':
 			l.backup()
-			l.emit(tokenQuoted)
+			l.emit(tokenQuote)
 			l.next()
 			lexVariable(l)
 		case '[':
 			l.backup()
-			l.emit(tokenQuoted)
+			l.emit(tokenQuote)
 			l.next()
 			lexCommand(l)
 		case '"':
 			// reached the end of the string
-			l.emit(tokenQuoted)
+			l.emit(tokenQuote)
 			return l.state
 		}
 	}
@@ -262,7 +312,7 @@ func lexComment(l *lexer) stateFn {
 		switch r {
 		case eof:
 			l.ignore()
-			return nil
+			return l.state
 		case '\n', '\r':
 			l.backup()
 			l.ignore()
@@ -300,17 +350,16 @@ func lexBrace(l *lexer) stateFn {
 }
 
 // lexString processes the text at the current location as if it were a
-// string that is not enclosed within quotes. If a variable or command
-// is encountered, control will be passed to the approrpiate state
-// function. If any whitespace is found, control returns to the starting
-// state.
+// string that is not enclosed within quotes. If any non-string
+// characters are encountered, the string token is emitted and control
+// returns to the starting state.
 func lexString(l *lexer) stateFn {
 	for {
 		r := l.next()
 		switch r {
 		case eof:
 			l.emit(tokenString)
-			return nil
+			return l.state
 		case '\\':
 			// pass over escaped characters
 			l.next()
@@ -328,7 +377,7 @@ func lexString(l *lexer) stateFn {
 // bracket ([) and advances to the end of the command (marked by a
 // closing square bracket (]).
 func lexCommand(l *lexer) stateFn {
-	level := 1 // open command count
+	level := 1  // open command count
 	blevel := 0 // open brace count
 	for {
 		r := l.next()
@@ -360,7 +409,7 @@ func lexCommand(l *lexer) stateFn {
 // as a string.
 func lexVariable(l *lexer) stateFn {
 	braced := false
-	r := l.next();
+	r := l.next()
 	if r == '{' {
 		// variable is of the form ${foo}
 		r = l.next()
@@ -377,7 +426,7 @@ func lexVariable(l *lexer) stateFn {
 	} else {
 		l.backup()
 	}
-	if l.start == l.pos - 1 {
+	if l.start == l.pos-1 {
 		// it's not a variable reference
 		return lexString
 	}

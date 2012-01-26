@@ -11,62 +11,62 @@ import (
 )
 
 // commandIf implements the Tcl 'if/then/elseif/else' command.
-func commandIf(i *Interpreter, argv []string, data []string) (parserState, string) {
+func commandIf(i *Interpreter, argv []string, data []string) (string, *TclError) {
 	// if expr1 ?then? body1 elseif expr2 ?then? body2 elseif ... ?else? ?bodyN?
 	if len(argv) != 3 && len(argv) != 5 {
-		return i.arityError(argv[0]), ""
+		return "", i.arityError(argv[0])
 	}
 	// TODO: allow optional 'then' keyword
-	state, err := i.Evaluate(argv[1])
-	if state != stateOK {
-		return state, err.String()
+	err := i.Evaluate(argv[1])
+	if err != nil {
+		return "", err
 	}
 	// TODO: support additional elseif/then clauses
 	b, err := evalBoolean(i.result)
 	if err != nil {
-		return stateError, err.String()
+		return "", err
 	}
 	if b {
-		state, err = i.Evaluate(argv[2])
+		err = i.Evaluate(argv[2])
 	} else if len(argv) == 5 {
 		if argv[3] != "else" {
-			return stateError, "missing 'else' keyword prior to last body"
+			return "", NewTclError(ECOMMAND, "missing 'else' keyword prior to last body")
 		}
 		// TODO: need to check that second last argument is 'else'
-		state, err = i.Evaluate(argv[4])
+		err = i.Evaluate(argv[4])
 	}
 	if err != nil {
-		return stateError, err.String()
+		return "", err
 	}
-	return state, i.result
+	return i.result, nil
 }
 
 // commandPuts implements the Tcl 'puts' command (print a string to the console).
-func commandPuts(i *Interpreter, argv []string, data []string) (parserState, string) {
+func commandPuts(i *Interpreter, argv []string, data []string) (string, *TclError) {
 	if len(argv) != 2 {
-		return i.arityError(argv[0]), ""
+		return "", i.arityError(argv[0])
 	}
 	fmt.Printf("%s\n", argv[1])
-	return stateOK, argv[1]
+	return argv[1], nil
 }
 
 // commandSet implements the Tcl 'set' command (set a variable value).
-func commandSet(i *Interpreter, argv []string, data []string) (parserState, string) {
+func commandSet(i *Interpreter, argv []string, data []string) (string, *TclError) {
 	if len(argv) < 2 {
-		return i.arityError(argv[0]), ""
+		return "", i.arityError(argv[0])
 	}
 	if len(argv) == 3 {
 		err := i.SetVariable(argv[1], argv[2])
 		if err != nil {
-			return stateError, err.Error()
+			return "", err
 		}
-		return stateOK, argv[2]
+		return argv[2], nil
 	} else {
 		val, err := i.GetVariable(argv[1])
 		if err != nil {
-			return stateError, err.Error()
+			return "", err
 		}
-		return stateOK, val
+		return val, nil
 	}
 	panic("unreachable code reached")
 }

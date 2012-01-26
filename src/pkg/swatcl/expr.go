@@ -70,14 +70,14 @@ type Evaluator interface {
 // exprNode contains the attributes of an expression node, whether it
 // is a numeric or string literal, or a command or variable reference.
 type exprNode struct {
-	token parserToken
+	token tokenType
 	text  string
 	eval  *evaluator
 }
 
 // newExprNode creates a new expression node based on the token and text.
-func newExprNode(eval *evaluator, token parserToken, text string) *exprNode {
-	return &exprNode{token, text, eval}
+func newExprNode(eval *evaluator, token token) *exprNode {
+	return &exprNode{token.typ, token.contents(), eval}
 }
 
 // evaluate evaluates the expression node appropriately based on its type.
@@ -99,7 +99,7 @@ func (n *exprNode) evaluate() (interface{}, *TclError) {
 		return atoi(n.text)
 	case tokenFloat:
 		return atof(n.text)
-	case tokenString:
+	case tokenString, tokenQuote:
 		// perform basic string substitution (slash escapes)
 		return evalString(n.text)
 	case tokenBrace:
@@ -125,12 +125,12 @@ type evaluator struct {
 	arguments vector.Vector // argument stack
 	operators vector.Vector // operator stack
 	funcCount int
-	//prevToken parserToken
+	//prevToken tokenType
 }
 
 func newEvaluator(interp *Interpreter) *evaluator {
 	e := &evaluator{
-		state: searchArgument,
+		state:  searchArgument,
 		interp: interp,
 	}
 	return e
@@ -452,7 +452,7 @@ func (e *evaluator) handleComma() *TclError {
 // variable references, nested commands (inside square brackets), string
 // and numeric literals, and math and type coercion functions.
 func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
-	p := NewParser(expr)
+	c := lexExpr("EvaluateExpression", expr)
 	e := newEvaluator(interp)
 
 	// TODO: get the evaluator working with operator precedence (e.g. * before +)
@@ -462,30 +462,30 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 	// TODO: get the evaluator working for function invocation
 
 	for {
-		// pull tokens from parser, building expression tree
-		p.parseExprToken()
-		if p.token == tokenEOF {
+		// pull tokens from lexer, building expression tree
+		token := <-c
+		if token.typ == tokenEOF {
 			err := e.handleEOF()
 			if err != nil {
 				return "", err
 			}
 			break
 		}
-		t := p.GetTokenText()
-		if p.token == tokenVariable || p.token == tokenCommand ||
-			p.token == tokenInteger || p.token == tokenFloat ||
-			p.token == tokenString || p.token == tokenBrace {
-			node := newExprNode(e, p.token, t)
+		if token.typ == tokenVariable || token.typ == tokenCommand ||
+			token.typ == tokenInteger || token.typ == tokenFloat ||
+			token.typ == tokenString || token.typ == tokenBrace ||
+			token.typ == tokenQuote {
+			node := newExprNode(e, token)
 			e.arguments.Push(node)
 			e.state = searchOperator
 
-		} else if p.token == tokenOperator {
+		} else if token.typ == tokenOperator {
 			// based on search state, it's either a unary or binary operator
 			var node *operatorNode
 			if e.state == searchOperator {
-				node = newOperatorNode(e, p.token, t, 2)
+				node = newOperatorNode(e, token, 2)
 			} else if e.state == searchArgument {
-				node = newOperatorNode(e, p.token, t, 1)
+				node = newOperatorNode(e, token, 1)
 			}
 
 			// If the operator stack is empty, push the new operator.
@@ -509,11 +509,11 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 			e.operators.Push(node)
 			e.state = searchArgument
 
-		} else if p.token == tokenFunction {
+		} else if token.typ == tokenFunction {
 			// TODO: expecting arguments until right parenthesis encountered
 			e.funcCount++
 			// TODO: should be constructing functionNode here
-			node := newExprNode(e, p.token, t)
+			node := newExprNode(e, token)
 			// Put it on the argument stack as a sentinel, to mark
 			// the beginning of the method arguments.
 			e.arguments.Push(node)
@@ -523,13 +523,10 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 			e.operators.Push(node)
 			e.state = searchArgument
 
-		} else if p.token == tokenParen {
+		} else if token.typ == tokenParen {
 			// TODO: grouping operator, call caseTLParenthese
 
-		} else if p.token == tokenSeparator {
-			// Not finished parsing, continue
-			continue
-		} else if p.token == tokenComma {
+		} else if token.typ == tokenComma {
 			e.handleComma()
 		}
 	}

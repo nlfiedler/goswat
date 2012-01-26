@@ -31,7 +31,7 @@ func coerceNumber(expr string) (interface{}, *TclError) {
 	if len(expr) > 1 && (expr[0] == '-' || expr[0] == '+') {
 		pe = expr[1:]
 	}
-	_, c := lexExpr("expr", pe)
+	c := lexExpr("expr", pe)
 	token := <-c
 	if token.typ == tokenFloat {
 		return atof(expr)

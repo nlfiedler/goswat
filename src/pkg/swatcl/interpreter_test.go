@@ -83,12 +83,12 @@ func TestInterpPopFrame(t *testing.T) {
 
 func TestInterpRegisterCommand(t *testing.T) {
 	interp := NewInterpreter()
-	state, _ := interp.RegisterCommand("foo", nil, nil)
-	if state != stateOK {
+	err := interp.RegisterCommand("foo", nil, nil)
+	if err != nil {
 		t.Error("failed to register command foo")
 	}
-	state, err := interp.RegisterCommand("foo", nil, nil)
-	if state != stateError {
+	err = interp.RegisterCommand("foo", nil, nil)
+	if err == nil {
 		t.Error("should have failed to register command foo second time")
 	}
 	if err.Errno != ECMDDEF {
@@ -189,16 +189,16 @@ func TestInterpSetGetFrames(t *testing.T) {
 var testCmdCalled bool
 var testCmdArgs string
 
-func testCmd(context *Interpreter, argv []string, data []string) (parserState, string) {
+func testCmd(context *Interpreter, argv []string, data []string) (string, *TclError) {
 	testCmdCalled = true
 	testCmdArgs = strings.Join(argv[1:], ",")
-	return stateOK, "cmd"
+	return "cmd", nil
 }
 
 func TestInterpInvokeCommand(t *testing.T) {
 	interp := NewInterpreter()
-	state, _ := interp.RegisterCommand("foo", testCmd, nil)
-	if state != stateOK {
+	err := interp.RegisterCommand("foo", testCmd, nil)
+	if err != nil {
 		t.Error("failed to register command foo")
 	}
 	args := make([]string, 0)
@@ -206,12 +206,9 @@ func TestInterpInvokeCommand(t *testing.T) {
 	args = append(args, "a")
 	args = append(args, "b")
 	args = append(args, "c")
-	state, err := interp.InvokeCommand(args)
+	err = interp.InvokeCommand(args)
 	if err != nil {
 		t.Error("failed to invoke command foo")
-	}
-	if state != stateOK {
-		t.Error("command foo failed to return stateOK")
 	}
 	if !testCmdCalled {
 		t.Error("InvokeCommand failed to invoke testCmd")
@@ -230,12 +227,9 @@ func TestInterpInvokeCommand(t *testing.T) {
 
 func TestInterpEvaluateCommand(t *testing.T) {
 	interp := NewInterpreter()
-	state, err := interp.Evaluate("set foo bar")
+	err := interp.Evaluate("set foo bar")
 	if err != nil {
 		t.Error("failed to invoke command set")
-	}
-	if state != stateOK {
-		t.Error("command set failed to return stateOK")
 	}
 	if interp.result != "bar" {
 		t.Error("set failed to affect result of interpreter")
@@ -255,12 +249,9 @@ func TestInterpEvaluateVariable(t *testing.T) {
 	if err != nil {
 		t.Error("failed to set variable")
 	}
-	state, err := interp.Evaluate("set $foo quux")
+	err = interp.Evaluate("set $foo quux")
 	if err != nil {
 		t.Errorf("failed to reference variable: %s", err)
-	}
-	if state != stateOK {
-		t.Error("variable reference failed to return stateOK")
 	}
 	if interp.result != "quux" {
 		t.Error("var ref failed to affect result of interpreter")

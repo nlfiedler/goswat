@@ -24,8 +24,9 @@ type operatorNode struct {
 // TODO: left paren is an operator node with precedence of 1 and a sentinel flag
 
 // newOperatorNode constructs an operator node based on the given attributes.
-func newOperatorNode(eval *evaluator, token parserToken, text string, arity int) *operatorNode {
-	node := &operatorNode{exprNode{token, text, eval}, arity, nil, nil, 0, false}
+func newOperatorNode(eval *evaluator, token token, arity int) *operatorNode {
+	text := token.contents()
+	node := &operatorNode{exprNode{token.typ, text, eval}, arity, nil, nil, 0, false}
 	// determine operator precedence
 	switch text {
 	case "~", "!":
