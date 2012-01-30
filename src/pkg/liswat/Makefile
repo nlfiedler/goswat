@@ -8,6 +8,10 @@ include $(GOROOT)/src/Make.inc
 
 TARG=swatcl
 GOFILES=\
+	errors.go\
+	interpreter.go\
 	lexer.go\
+	pair.go\
+	parser.go\
 
 include $(GOROOT)/src/Make.pkg

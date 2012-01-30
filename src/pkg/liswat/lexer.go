@@ -26,19 +26,20 @@ const eof = unicode.UpperLower
 
 // token types
 const (
-	_             tokenType = iota // error occurred
-	tokenError                     // error occurred
-	tokenString                    // string token
-	tokenVariable                  // variable token
-	tokenInteger                   // integer literal
-	tokenFloat                     // floating point literal
-	tokenParen                     // open/close parenthesis
-	tokenEOF                       // end-of-file token
+	_               tokenType = iota // error occurred
+	tokenError                       // error occurred
+	tokenString                      // string token
+	tokenSymbol                      // symbol token
+	tokenInteger                     // integer literal
+	tokenFloat                       // floating point literal
+	tokenOpenParen                   // open parenthesis
+	tokenCloseParen                  // close parenthesis
+	tokenEOF                         // end-of-file token
 )
 
 // token represents a token returned from the scanner.
 type token struct {
-	typ tokenType // Type, such as tokenNumber.
+	typ tokenType // Type, such as tokenFloat.
 	val string    // Value, such as "23.2".
 }
 
@@ -203,8 +204,11 @@ func lexStart(l *lexer) stateFn {
 	case eof:
 		l.emit(tokenEOF)
 		return nil
-	case '(', ')':
-		l.emit(tokenParen)
+	case '(':
+		l.emit(tokenOpenParen)
+		return lexStart
+	case ')':
+		l.emit(tokenCloseParen)
 		return lexStart
 	case ' ', '\t', '\r', '\n':
 		return lexSeparator
@@ -217,14 +221,14 @@ func lexStart(l *lexer) stateFn {
 	case '"':
 		return lexQuotes
 	default:
-		return lexVariable
+		return lexSymbol
 	}
 	panic("unreachable code")
 }
 
 // lexQuotes expects the current character to be a double-quote and
 // scans the input to find the end of the quoted string, possibly
-// emitting string tokens as well as variable and command tokens.
+// emitting string tokens as well as symbol and command tokens.
 func lexQuotes(l *lexer) stateFn {
 	for {
 		r := l.next()
@@ -267,9 +271,9 @@ func lexComment(l *lexer) stateFn {
 	panic("unreachable code")
 }
 
-// lexVariable processes the text at the current location as if it were
-// a variable reference.
-func lexVariable(l *lexer) stateFn {
+// lexSymbol processes the text at the current location as if it were
+// a symbol reference.
+func lexSymbol(l *lexer) stateFn {
 	for {
 		r := l.next()
 		switch r {
@@ -279,9 +283,9 @@ func lexVariable(l *lexer) stateFn {
 			// pass over escaped characters
 			l.next()
 		case '(', ')', ' ', '\t', '\n', '\r':
-			// reached the end of the variable
+			// reached the end of the symbol
 			l.backup()
-			l.emit(tokenVariable)
+			l.emit(tokenSymbol)
 			return lexStart
 		}
 	}

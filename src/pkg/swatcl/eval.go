@@ -78,10 +78,10 @@ func atoi(text string) (interface{}, *TclError) {
 }
 
 // evalBoolean attempts to interpret the given string as a boolean
-// expression. If expr is a number, 0 means false while all other number
-// result in true. If expr is "yes" or "true" then the result is true.
-// If expr is "no" or "false" then the result is false. Otherwise an
-// error is returned.
+// expression. If expr is a number, 0 means false while all other
+// numbers result in true. If expr is "yes" or "true" then the result is
+// true. If expr is "no" or "false" then the result is false. Otherwise
+// an error is returned.
 func evalBoolean(expr string) (bool, *TclError) {
 	n, err := strconv.Atoi(expr)
 	if err == nil {
@@ -109,7 +109,7 @@ func hexCharToByte(r rune) rune {
 	} else {
 		return -1
 	}
-	panic("unreachable")
+	panic("unreachable code")
 }
 
 // octCharToByte converts the given character to a byte value, where the
@@ -121,7 +121,7 @@ func octCharToByte(r rune) rune {
 	} else {
 		return -1
 	}
-	panic("unreachable")
+	panic("unreachable code")
 }
 
 // evalString performs string substitution on the given expression,
