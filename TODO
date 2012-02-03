@@ -1,15 +1,11 @@
 GoSwat Checklist (-*- text -*-)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Write a basic Tcl interpreter based on the picol example
-  - Rewrite the lexer and parser in the way described by Rob Pike for the Go template package
-  - When it can execute basic Tcl scripts, set up the project on Google Code
-- Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
-+ evaluate the exp/ogle package
-  - seems to have all of the basics in place
-  - should understand the design and create a new design to address TODO comments
-  - see how it uses debug/elf and debug/dwarf
-+ evaluate the debug packages (dwarf, elf, etc) for re-use
++ Evaluate the exp/ogle package
+  - Seems to have all of the basics in place
+  - Should understand the design and create a new design to address TODO comments
+  - See how it uses debug/elf and debug/dwarf
++ Evaluate the debug packages (dwarf, elf, etc) for re-use
   - dwarf pkg implements 2.0 standard
   - elf pkg appears up-to-date
   - proc pkg provides basic debugging support
@@ -17,6 +13,9 @@ GoSwat Checklist (-*- text -*-)
     - processes
     - threads
     - registers
+- Write a basic Scheme and/or Tcl interpreter
+  - When it can execute basic scripts, set up the project on Google Code
+- Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
 - Utilize one of the following to facilitate a psuedo GUI in the console
   - https://github.com/nsf/termbox
   - https://github.com/jabb/gocurse
@@ -28,4 +27,4 @@ GoSwat Checklist (-*- text -*-)
   - Source view area
   - Variables view area
   - Registers view area
-  - Compile Tcl to bytecode
+  - Compile Scheme/Tcl to bytecode

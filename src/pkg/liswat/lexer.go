@@ -26,12 +26,15 @@ const eof = unicode.UpperLower
 
 // token types
 const (
-	_               tokenType = iota // error occurred
+	_               tokenType = iota // undefined
 	tokenError                       // error occurred
-	tokenString                      // string token
-	tokenSymbol                      // symbol token
+	tokenString                      // string literal
+	tokenQuote                       // quoted list
+	tokenCharacter                   // character literal
+	tokenIdentifier                  // identifier token
 	tokenInteger                     // integer literal
 	tokenFloat                       // floating point literal
+	tokenBoolean                     // boolean value (#t or #f)
 	tokenOpenParen                   // open parenthesis
 	tokenCloseParen                  // close parenthesis
 	tokenEOF                         // end-of-file token
@@ -162,6 +165,12 @@ func (l *lexer) backup() {
 	l.pos -= l.width
 }
 
+// rewind moves the current position back to the start of the current
+// token.
+func (l *lexer) rewind() {
+	l.pos = l.start
+}
+
 // peek returns but does not consume the next rune in the input.
 func (l *lexer) peek() rune {
 	r := l.next()
@@ -212,24 +221,29 @@ func lexStart(l *lexer) stateFn {
 		return lexStart
 	case ' ', '\t', '\r', '\n':
 		return lexSeparator
-	case '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		// let lexNumber sort out what type of number it is
 		l.backup()
 		return lexNumber
 	case ';':
 		return lexComment
 	case '"':
-		return lexQuotes
+		return lexString
+	case '#':
+		return lexHash
+	case '\'', '`', ',':
+		return lexQuote
 	default:
-		return lexSymbol
+		// let lexIdentifier sort out what exactly this is
+		l.backup()
+		return lexIdentifier
 	}
 	panic("unreachable code")
 }
 
-// lexQuotes expects the current character to be a double-quote and
-// scans the input to find the end of the quoted string, possibly
-// emitting string tokens as well as symbol and command tokens.
-func lexQuotes(l *lexer) stateFn {
+// lexString expects the current character to be a double-quote and
+// scans the input to find the end of the quoted string.
+func lexString(l *lexer) stateFn {
 	for {
 		r := l.next()
 		switch r {
@@ -264,6 +278,8 @@ func lexComment(l *lexer) stateFn {
 		r := l.next()
 		switch r {
 		case eof, '\n', '\r':
+			// whitespace after comment is significant (r5rs 2.2),
+			// but we ignore whitespace anyway
 			l.ignore()
 			return lexStart
 		}
@@ -271,23 +287,70 @@ func lexComment(l *lexer) stateFn {
 	panic("unreachable code")
 }
 
-// lexSymbol processes the text at the current location as if it were
-// a symbol reference.
-func lexSymbol(l *lexer) stateFn {
+// lexIdentifier processes the text at the current location as if it were
+// an identifier.
+func lexIdentifier(l *lexer) stateFn {
+	r := l.next()
+	// check for special case first characters that may be the start
+	// of a number or used as identifiers all by themselves, but
+	// cannot be at the beginning of an identifier: + - . ...
+	// (r5rs 2.1, 2.3, 4.1.4)
+	if r == '.' {
+		r = l.next()
+		if r == '.' {
+			r = l.next()
+			if r == '.' {
+				// ... must be followed by whitespace
+				if !l.accept(" \t\r\n") {
+					return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+				}
+			} else {
+				// there is no .. in r5rs
+				return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+			}
+		} else if unicode.IsDigit(r) {
+			l.rewind()
+			return lexNumber
+		} else if r != ' ' && r != '\t' && r != '\r' && r != '\n' {
+			// period must be whitespace delimited to be an identifier
+			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+		}
+		l.backup()
+		l.emit(tokenIdentifier)
+		return lexStart
+
+	} else if r == '+' || r == '-' {
+		// +/- must be whitespace delimited to be a identifier
+		if unicode.IsDigit(l.peek()) {
+			l.rewind()
+			return lexNumber
+		}
+		if !l.accept(" \t\r\n") {
+			// period must be whitespace delimited to be a identifier
+			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+		}
+		l.backup()
+		l.emit(tokenIdentifier)
+		return lexStart
+	}
+
 	for {
-		r := l.next()
-		switch r {
-		case eof:
+		if r == eof {
 			return l.errorf("unexpectedly reached end at %q", l.input[l.start:l.pos])
-		case '\\':
-			// pass over escaped characters
-			l.next()
-		case '(', ')', ' ', '\t', '\n', '\r':
-			// reached the end of the symbol
+		}
+		// check for the end of the identifier (note that these are assumed
+		// to not appear as the first character, as lexStart would have
+		// sent control to some other state function)
+		if strings.ContainsRune("'\",`;() \t\n\r", r) {
 			l.backup()
-			l.emit(tokenSymbol)
+			l.emit(tokenIdentifier)
 			return lexStart
 		}
+		// identifiers are letters, numbers, and extended characters (r5rs 2.1)
+		if !isAlphaNumeric(r) && !strings.ContainsRune("!$%&*+-./:<=>?@^_~", r) {
+			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+		}
+		r = l.next()
 	}
 	panic("unreachable code")
 }
@@ -298,8 +361,8 @@ func lexNumber(l *lexer) stateFn {
 
 	//
 	// Can expect integer in octal, decimal, or hexadecimal, as well
-	// as floating point, with optional exponent. Any leading sign
-	// is handled elsewhere as a unary minus operator.
+	// as floating point, with optional exponent. A leading sign is
+	// also permitted (+ or -)
 	//
 	// 1
 	// 2.1
@@ -311,6 +374,7 @@ func lexNumber(l *lexer) stateFn {
 	// 0x7b5 (hexadecimal)
 	//
 
+	l.accept("+-")
 	float := false
 	if l.accept("0") && l.accept("xX") {
 		// hexadecimal
@@ -349,4 +413,65 @@ func lexNumber(l *lexer) stateFn {
 // isAlphaNumeric indicates if the given rune is a letter or number.
 func isAlphaNumeric(r rune) bool {
 	return unicode.IsDigit(r) || unicode.IsLetter(r)
+}
+
+// lexHash process all of the # tokens.
+func lexHash(l *lexer) stateFn {
+	r := l.next()
+	switch r {
+	case 't', 'f', 'T', 'F':
+		l.emit(tokenBoolean)
+		return lexStart
+	case '(':
+		// TODO: handle converting list to vector
+		return nil
+	case 'e', 'i', 'd', 'b', 'o', 'x':
+		// TODO: handle numeric notation
+		return nil
+	case '\\':
+		// check if 'space' or 'newline'
+		l.acceptRun("aceilnpsw")
+		sym := l.input[l.start+2 : l.pos]
+		if sym == "newline" {
+			l.tokens <- token{tokenCharacter, "#\\\n"}
+			l.start = l.pos
+		} else if sym == "space" {
+			l.tokens <- token{tokenCharacter, "#\\ "}
+			l.start = l.pos
+		} else {
+			// go back to #, consume #\...
+			l.rewind()
+			l.next()
+			l.next()
+			// ...and assert that it is a single character
+			if !unicode.IsLetter(l.next()) {
+				return l.errorf("malformed character escape: %q", l.input[l.start:l.pos])
+			}
+			if isAlphaNumeric(l.peek()) {
+				l.next()
+				return l.errorf("malformed character escape: %q", l.input[l.start:l.pos])
+			}
+			l.emit(tokenCharacter)
+		}
+		return lexStart
+	default:
+		return l.errorf("unrecognized hash value: %q", l.input[l.start:l.pos])
+	}
+	panic("unreachable code")
+}
+
+// lexQuote processes the special quoting characters.
+func lexQuote(l *lexer) stateFn {
+	// we already know its one of the quoting characters, just need
+	// to check if it is the two character ,@ form
+	l.backup()
+	r := l.next()
+	if r == ',' {
+		r = l.next()
+		if r != '@' {
+			l.backup()
+		}
+	}
+	l.emit(tokenQuote)
+	return lexStart
 }

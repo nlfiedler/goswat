@@ -7,33 +7,49 @@
 package swatcl
 
 import (
+	"strings"
 	"testing"
 )
 
-// expectedResult is equivalent to a token and is used in comparing the
+// expectedLexerResult is equivalent to a token and is used in comparing the
 // results from the lexer.
-type expectedResult struct {
+type expectedLexerResult struct {
 	typ tokenType
 	val string
 }
 
+type expectedLexerError struct {
+	err string // expected error message substring
+	msg string // explanation of error condition
+}
+
+// drainLexerChannel reads from the given channel until it closes.
+func drainLexerChannel(c chan token) {
+	for {
+		_, ok := <-c
+		if !ok {
+			break
+		}
+	}
+}
+
 // verifyLexerResults calls lex() and checks that the resulting tokens
 // match the expected results.
-func verifyLexerResults(t *testing.T, input string, expected []expectedResult) {
+func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResult) {
 	c := lex("unit", input)
 	verifyLexerResults0(t, c, expected)
 }
 
 // verifyLexerExprResults calls lexExpr() and checks that the resulting
 // tokens match the expected results.
-func verifyLexerExprResults(t *testing.T, input string, expected []expectedResult) {
+func verifyLexerExprResults(t *testing.T, input string, expected []expectedLexerResult) {
 	c := lexExpr("unit", input)
 	verifyLexerResults0(t, c, expected)
 }
 
 // verifyLexerResults0 takes the output of lex() and lexExpr() and
 // compares the results with the expected results.
-func verifyLexerResults0(t *testing.T, c chan token, expected []expectedResult) {
+func verifyLexerResults0(t *testing.T, c chan token, expected []expectedLexerResult) {
 	for i, e := range expected {
 		token, ok := <-c
 		if !ok {
@@ -46,15 +62,35 @@ func verifyLexerResults0(t *testing.T, c chan token, expected []expectedResult) 
 			t.Errorf("expected '%s', got '%s' (token %d, type %d)", e.val, token.val, i, e.typ)
 		}
 	}
+	drainLexerChannel(c)
+}
+
+// verifyLexerErrors calls lex() and checks that the resulting tokens
+// resulted in an error, and (optionally) verifies the error message.
+func verifyLexerErrors(t *testing.T, input map[string]expectedLexerError) {
+	for i, e := range input {
+		c := lex("unit", i)
+		tok, ok := <-c
+		if !ok {
+			t.Errorf("lexer channel closed?")
+		}
+		if tok.typ != tokenError {
+			t.Errorf("expected '%s' to fail with '%s'", i, e.err)
+		}
+		if !strings.Contains(tok.val, e.err) {
+			t.Errorf("expected '%s' but got '%s'(%d) for input '%s'", e.err, tok.val, tok.typ, i)
+		}
+		drainLexerChannel(c)
+	}
 }
 
 func TestLexerSetCommand(t *testing.T) {
 	input := "set foo bar"
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenString, "set"})
-	expected = append(expected, expectedResult{tokenString, "foo"})
-	expected = append(expected, expectedResult{tokenString, "bar"})
-	expected = append(expected, expectedResult{tokenEOF, ""})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "foo"})
+	expected = append(expected, expectedLexerResult{tokenString, "bar"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -63,11 +99,11 @@ func TestLexerComments(t *testing.T) {
 # bar baz
 # quux
 `
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenEOF, ""})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -84,35 +120,35 @@ foobar
 "foo $bar"
 "f\to;o\\\"b\na\rr"
 `
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenCommand, "[command foo bar]"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "$"})
-	expected = append(expected, expectedResult{tokenVariable, "$x"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenVariable, "$foo"})
-	expected = append(expected, expectedResult{tokenString, "bar"})
-	expected = append(expected, expectedResult{tokenString, "baz"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenCommand, "[puts {hey [diddle] diddle} foo]"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "foobar"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenBrace, "{}"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenBrace, "{foo {bar}}"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenQuote, "\"foo "})
-	expected = append(expected, expectedResult{tokenCommand, "[bar]"})
-	expected = append(expected, expectedResult{tokenQuote, "\""})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenQuote, "\"foo "})
-	expected = append(expected, expectedResult{tokenVariable, "$bar"})
-	expected = append(expected, expectedResult{tokenQuote, "\""})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenQuote, `"f\to;o\\\"b\na\rr"`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenCommand, "[command foo bar]"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "$"})
+	expected = append(expected, expectedLexerResult{tokenVariable, "$x"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenVariable, "$foo"})
+	expected = append(expected, expectedLexerResult{tokenString, "bar"})
+	expected = append(expected, expectedLexerResult{tokenString, "baz"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenCommand, "[puts {hey [diddle] diddle} foo]"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "foobar"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{}"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{foo {bar}}"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenQuote, "\"foo "})
+	expected = append(expected, expectedLexerResult{tokenCommand, "[bar]"})
+	expected = append(expected, expectedLexerResult{tokenQuote, "\""})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenQuote, "\"foo "})
+	expected = append(expected, expectedLexerResult{tokenVariable, "$bar"})
+	expected = append(expected, expectedLexerResult{tokenQuote, "\""})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"f\to;o\\\"b\na\rr"`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -133,58 +169,58 @@ puts {There are no substitutions done within braces \n \r \x0a \f \v}
 puts {But, the escaped newline at the end of a\
 string is still evaluated as a space}
 `
-	expected := make([]expectedResult, 0)
+	expected := make([]expectedLexerResult, 0)
 	// 0
-	expected = append(expected, expectedResult{tokenString, "set"})
-	expected = append(expected, expectedResult{tokenString, "Z"})
-	expected = append(expected, expectedResult{tokenString, "Albany"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "Z"})
+	expected = append(expected, expectedLexerResult{tokenString, "Albany"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
 	// 5
-	expected = append(expected, expectedResult{tokenString, "Z_LABEL"})
-	expected = append(expected, expectedResult{tokenQuote, `"The Capitol of New York is: "`})
-	expected = append(expected, expectedResult{tokenEOL, "\n\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenQuote, `"\n................. examples of differences between  \" and \{"`})
+	expected = append(expected, expectedLexerResult{tokenString, "Z_LABEL"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"The Capitol of New York is: "`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"\n................. examples of differences between  \" and \{"`})
 	// 10
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenQuote, `"`})
-	expected = append(expected, expectedResult{tokenVariable, `$Z_LABEL`})
-	expected = append(expected, expectedResult{tokenQuote, " "})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"`})
+	expected = append(expected, expectedLexerResult{tokenVariable, `$Z_LABEL`})
+	expected = append(expected, expectedLexerResult{tokenQuote, " "})
 	// 15
-	expected = append(expected, expectedResult{tokenVariable, `$Z`})
-	expected = append(expected, expectedResult{tokenQuote, `"`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenBrace, `{$Z_LABEL $Z}`})
+	expected = append(expected, expectedLexerResult{tokenVariable, `$Z`})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenBrace, `{$Z_LABEL $Z}`})
 	// 20
-	expected = append(expected, expectedResult{tokenEOL, "\n\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenQuote, `"\n....... examples of differences in nesting \{ and \" "`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"\n....... examples of differences in nesting \{ and \" "`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
 	// 25
-	expected = append(expected, expectedResult{tokenQuote, `"`})
-	expected = append(expected, expectedResult{tokenVariable, `$Z_LABEL`})
-	expected = append(expected, expectedResult{tokenQuote, " {"})
-	expected = append(expected, expectedResult{tokenVariable, `$Z`})
-	expected = append(expected, expectedResult{tokenQuote, `}"`})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"`})
+	expected = append(expected, expectedLexerResult{tokenVariable, `$Z_LABEL`})
+	expected = append(expected, expectedLexerResult{tokenQuote, " {"})
+	expected = append(expected, expectedLexerResult{tokenVariable, `$Z`})
+	expected = append(expected, expectedLexerResult{tokenQuote, `}"`})
 	// 30
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenBrace, `{Who said, "What this country needs is a good $0.05 cigar!"?}`})
-	expected = append(expected, expectedResult{tokenEOL, "\n\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenBrace, `{Who said, "What this country needs is a good $0.05 cigar!"?}`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
 	// 35
-	expected = append(expected, expectedResult{tokenQuote, `"\n................. examples of escape strings"`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenBrace, `{There are no substitutions done within braces \n \r \x0a \f \v}`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"\n................. examples of escape strings"`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenBrace, `{There are no substitutions done within braces \n \r \x0a \f \v}`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
 	// 40
-	expected = append(expected, expectedResult{tokenString, "puts"})
-	expected = append(expected, expectedResult{tokenBrace, `{But, the escaped newline at the end of a\
+	expected = append(expected, expectedLexerResult{tokenString, "puts"})
+	expected = append(expected, expectedLexerResult{tokenBrace, `{But, the escaped newline at the end of a\
 string is still evaluated as a space}`}) // TODO: add test to interpreter_test.go, expect \n to be replaced with space
 	verifyLexerResults(t, input, expected)
 }
@@ -195,25 +231,25 @@ set z {[set x "This is a string within quotes within braces"]}
 set a "[set x {This is a string within braces within quotes}]"
 set b "\[set y {This is a string within braces within quotes}]"
 `
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenString, "set"})
-	expected = append(expected, expectedResult{tokenString, "y"})
-	expected = append(expected, expectedResult{tokenCommand, `[set x "def"]`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "set"})
-	expected = append(expected, expectedResult{tokenString, "z"})
-	expected = append(expected, expectedResult{tokenBrace, `{[set x "This is a string within quotes within braces"]}`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "set"})
-	expected = append(expected, expectedResult{tokenString, "a"})
-	expected = append(expected, expectedResult{tokenQuote, `"`})
-	expected = append(expected, expectedResult{tokenCommand, "[set x {This is a string within braces within quotes}]"})
-	expected = append(expected, expectedResult{tokenQuote, `"`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
-	expected = append(expected, expectedResult{tokenString, "set"})
-	expected = append(expected, expectedResult{tokenString, "b"})
-	expected = append(expected, expectedResult{tokenQuote, `"\[set y {This is a string within braces within quotes}]"`})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "y"})
+	expected = append(expected, expectedLexerResult{tokenCommand, `[set x "def"]`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "z"})
+	expected = append(expected, expectedLexerResult{tokenBrace, `{[set x "This is a string within quotes within braces"]}`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "a"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"`})
+	expected = append(expected, expectedLexerResult{tokenCommand, "[set x {This is a string within braces within quotes}]"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
+	expected = append(expected, expectedLexerResult{tokenString, "set"})
+	expected = append(expected, expectedLexerResult{tokenString, "b"})
+	expected = append(expected, expectedLexerResult{tokenQuote, `"\[set y {This is a string within braces within quotes}]"`})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -223,13 +259,13 @@ func TestLexerForLoop(t *testing.T) {
    create label $x
 }
 `
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenString, "for"})
-	expected = append(expected, expectedResult{tokenBrace, "{ set i 0 }"})
-	expected = append(expected, expectedResult{tokenBrace, "{ $i <= $number }"})
-	expected = append(expected, expectedResult{tokenBrace, "{ incr i }"})
-	expected = append(expected, expectedResult{tokenBrace, "{\n   set x [expr {$i*0.1}]\n   create label $x\n}"})
-	expected = append(expected, expectedResult{tokenEOL, "\n"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenString, "for"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{ set i 0 }"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{ $i <= $number }"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{ incr i }"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{\n   set x [expr {$i*0.1}]\n   create label $x\n}"})
+	expected = append(expected, expectedLexerResult{tokenEOL, "\n"})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -239,158 +275,119 @@ func TestLexerIfElse(t *testing.T) {
 } else {
     puts "$x is 1"
 }`
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenString, "if"})
-	expected = append(expected, expectedResult{tokenBrace, "{$x != 1}"})
-	expected = append(expected, expectedResult{tokenBrace, "{\n    puts \"$x is != 1\"\n}"})
-	expected = append(expected, expectedResult{tokenString, "else"})
-	expected = append(expected, expectedResult{tokenBrace, "{\n    puts \"$x is 1\"\n}"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenString, "if"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{$x != 1}"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{\n    puts \"$x is != 1\"\n}"})
+	expected = append(expected, expectedLexerResult{tokenString, "else"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "{\n    puts \"$x is 1\"\n}"})
 	verifyLexerResults(t, input, expected)
 }
 
 func TestLexerUnclosedQuotes(t *testing.T) {
-	input := `"foo`
-	c := lex("unit", input)
-	token, ok := <-c
-	if !ok {
-		t.Errorf("lexer channel closed?")
-	}
-	if token.typ != tokenError {
-		t.Errorf("expected lexing unclosed quote to fail")
-	}
-}
-
-func TestLexerUnclosedVariable(t *testing.T) {
-	input := `${foo`
-	c := lex("unit", input)
-	token, ok := <-c
-	if !ok {
-		t.Errorf("lexer channel closed?")
-	}
-	if token.typ != tokenError {
-		t.Errorf("expected lexing unclosed variable to fail")
-	}
-}
-
-func TestLexerUnclosedBrace(t *testing.T) {
-	input := `{foo`
-	c := lex("unit", input)
-	token, ok := <-c
-	if !ok {
-		t.Errorf("lexer channel closed?")
-	}
-	if token.typ != tokenError {
-		t.Errorf("expected lexing unclosed brace to fail")
-	}
-}
-
-func TestLexerUnclosedCommand(t *testing.T) {
-	input := `[foo`
-	c := lex("unit", input)
-	token, ok := <-c
-	if !ok {
-		t.Errorf("lexer channel closed?")
-	}
-	if token.typ != tokenError {
-		t.Errorf("expected lexing unclosed command to fail")
-	}
+	input := make(map[string]expectedLexerError)
+	input[`"foo`] = expectedLexerError{"unclosed quoted string", "unclosed quote should fail"}
+	input[`{foo`] = expectedLexerError{"unclosed left brace", "unclosed brace should fail"}
+	input[`${foo`] = expectedLexerError{"unclosed variable", "unclosed variable should fail"}
+	input[`[foo`] = expectedLexerError{"unclosed command", "unclosed command should fail"}
+	verifyLexerErrors(t, input)
 }
 
 func TestLexerNumbers(t *testing.T) {
 	input := "1 2.1 3. 6E4 7.91e+16 .000001 0366 0x7b5"
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenInteger, "1"})
-	expected = append(expected, expectedResult{tokenFloat, "2.1"})
-	expected = append(expected, expectedResult{tokenFloat, "3."})
-	expected = append(expected, expectedResult{tokenFloat, "6E4"})
-	expected = append(expected, expectedResult{tokenFloat, "7.91e+16"})
-	expected = append(expected, expectedResult{tokenFloat, ".000001"})
-	expected = append(expected, expectedResult{tokenInteger, "0366"})
-	expected = append(expected, expectedResult{tokenInteger, "0x7b5"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
+	expected = append(expected, expectedLexerResult{tokenFloat, "2.1"})
+	expected = append(expected, expectedLexerResult{tokenFloat, "3."})
+	expected = append(expected, expectedLexerResult{tokenFloat, "6E4"})
+	expected = append(expected, expectedLexerResult{tokenFloat, "7.91e+16"})
+	expected = append(expected, expectedLexerResult{tokenFloat, ".000001"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "0366"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "0x7b5"})
 	verifyLexerExprResults(t, input, expected)
 }
 
 func TestLexerOperators(t *testing.T) {
 	input := "- + ~ ! * / % < > = & ^ | ? : ** << >> <= >= && ||"
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenOperator, "-"})
-	expected = append(expected, expectedResult{tokenOperator, "+"})
-	expected = append(expected, expectedResult{tokenOperator, "~"})
-	expected = append(expected, expectedResult{tokenOperator, "!"})
-	expected = append(expected, expectedResult{tokenOperator, "*"})
-	expected = append(expected, expectedResult{tokenOperator, "/"})
-	expected = append(expected, expectedResult{tokenOperator, "%"})
-	expected = append(expected, expectedResult{tokenOperator, "<"})
-	expected = append(expected, expectedResult{tokenOperator, ">"})
-	expected = append(expected, expectedResult{tokenOperator, "="})
-	expected = append(expected, expectedResult{tokenOperator, "&"})
-	expected = append(expected, expectedResult{tokenOperator, "^"})
-	expected = append(expected, expectedResult{tokenOperator, "|"})
-	expected = append(expected, expectedResult{tokenOperator, "?"})
-	expected = append(expected, expectedResult{tokenOperator, ":"})
-	expected = append(expected, expectedResult{tokenOperator, "**"})
-	expected = append(expected, expectedResult{tokenOperator, "<<"})
-	expected = append(expected, expectedResult{tokenOperator, ">>"})
-	expected = append(expected, expectedResult{tokenOperator, "<="})
-	expected = append(expected, expectedResult{tokenOperator, ">="})
-	expected = append(expected, expectedResult{tokenOperator, "&&"})
-	expected = append(expected, expectedResult{tokenOperator, "||"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenOperator, "-"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "+"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "~"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "!"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "*"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "/"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "%"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "<"})
+	expected = append(expected, expectedLexerResult{tokenOperator, ">"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "="})
+	expected = append(expected, expectedLexerResult{tokenOperator, "&"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "^"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "|"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "?"})
+	expected = append(expected, expectedLexerResult{tokenOperator, ":"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "**"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "<<"})
+	expected = append(expected, expectedLexerResult{tokenOperator, ">>"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "<="})
+	expected = append(expected, expectedLexerResult{tokenOperator, ">="})
+	expected = append(expected, expectedLexerResult{tokenOperator, "&&"})
+	expected = append(expected, expectedLexerResult{tokenOperator, "||"})
 	verifyLexerExprResults(t, input, expected)
 }
 
 func TestLexerFunctions(t *testing.T) {
 	input := "a12() abs(123) max(1, 2) foo"
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenFunction, "a12("})
-	expected = append(expected, expectedResult{tokenParen, ")"})
-	expected = append(expected, expectedResult{tokenFunction, "abs("})
-	expected = append(expected, expectedResult{tokenInteger, "123"})
-	expected = append(expected, expectedResult{tokenParen, ")"})
-	expected = append(expected, expectedResult{tokenFunction, "max("})
-	expected = append(expected, expectedResult{tokenInteger, "1"})
-	expected = append(expected, expectedResult{tokenComma, ","})
-	expected = append(expected, expectedResult{tokenInteger, "2"})
-	expected = append(expected, expectedResult{tokenParen, ")"})
-	expected = append(expected, expectedResult{tokenError, "apparent function call missing (: \"foo\""})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenFunction, "a12("})
+	expected = append(expected, expectedLexerResult{tokenParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenFunction, "abs("})
+	expected = append(expected, expectedLexerResult{tokenInteger, "123"})
+	expected = append(expected, expectedLexerResult{tokenParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenFunction, "max("})
+	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
+	expected = append(expected, expectedLexerResult{tokenComma, ","})
+	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
+	expected = append(expected, expectedLexerResult{tokenParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenError, "apparent function call missing (: \"foo\""})
 	verifyLexerExprResults(t, input, expected)
 }
 
 func TestLexerExprNewline(t *testing.T) {
 	input := `123
 $foo`
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenInteger, "123"})
-	expected = append(expected, expectedResult{tokenError, "newline, semicolon, and hash not allowed in expression"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenInteger, "123"})
+	expected = append(expected, expectedLexerResult{tokenError, "newline, semicolon, and hash not allowed in expression"})
 	verifyLexerExprResults(t, input, expected)
 }
 
 func TestLexerExprComment(t *testing.T) {
 	input := "123 # foo"
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenInteger, "123"})
-	expected = append(expected, expectedResult{tokenError, "newline, semicolon, and hash not allowed in expression"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenInteger, "123"})
+	expected = append(expected, expectedLexerResult{tokenError, "newline, semicolon, and hash not allowed in expression"})
 	verifyLexerExprResults(t, input, expected)
 }
 
 func TestLexerExprSemicolon(t *testing.T) {
 	input := "123 ; foo"
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenInteger, "123"})
-	expected = append(expected, expectedResult{tokenError, "newline, semicolon, and hash not allowed in expression"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenInteger, "123"})
+	expected = append(expected, expectedLexerResult{tokenError, "newline, semicolon, and hash not allowed in expression"})
 	verifyLexerExprResults(t, input, expected)
 }
 
 func TestLexerTokenConents(t *testing.T) {
 	input := `$foo ${foo} [foo] "foo [bar] baz quux" {foo bar} foobar`
-	expected := make([]expectedResult, 0)
-	expected = append(expected, expectedResult{tokenVariable, "foo"})
-	expected = append(expected, expectedResult{tokenVariable, "foo"})
-	expected = append(expected, expectedResult{tokenCommand, "foo"})
-	expected = append(expected, expectedResult{tokenQuote, "foo "})
-	expected = append(expected, expectedResult{tokenCommand, "bar"})
-	expected = append(expected, expectedResult{tokenQuote, " baz quux"})
-	expected = append(expected, expectedResult{tokenBrace, "foo bar"})
-	expected = append(expected, expectedResult{tokenString, "foobar"})
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenVariable, "foo"})
+	expected = append(expected, expectedLexerResult{tokenVariable, "foo"})
+	expected = append(expected, expectedLexerResult{tokenCommand, "foo"})
+	expected = append(expected, expectedLexerResult{tokenQuote, "foo "})
+	expected = append(expected, expectedLexerResult{tokenCommand, "bar"})
+	expected = append(expected, expectedLexerResult{tokenQuote, " baz quux"})
+	expected = append(expected, expectedLexerResult{tokenBrace, "foo bar"})
+	expected = append(expected, expectedLexerResult{tokenString, "foobar"})
 	c := lex("unit", input)
 	for i, e := range expected {
 		token, ok := <-c
@@ -405,4 +402,5 @@ func TestLexerTokenConents(t *testing.T) {
 			t.Errorf("expected '%s', got '%s' (token %d, type %d)", e.val, txt, i, e.typ)
 		}
 	}
+	drainLexerChannel(c)
 }

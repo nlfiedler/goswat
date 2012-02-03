@@ -64,8 +64,8 @@ func TestList(t *testing.T) {
 	if p.Third() != nil {
 		t.Errorf("expected nil, but got '%s'", p.Third())
 	}
-	if p.String() != "(bar foo)" {
-		t.Errorf("expected (bar foo) but got '%s'", p.String())
+	if p.String() != "(bar . foo)" {
+		t.Errorf("expected (bar . foo) but got '%s'", p.String())
 	}
 }
 
@@ -74,7 +74,7 @@ func TestCons(t *testing.T) {
 	bar := Symbol("bar")
 	baz := Symbol("baz")
 	qux := Symbol("qux")
-	p := List(baz, qux)
+	p := Cons(baz, qux)
 	p = Cons(bar, p)
 	p = Cons(foo, p)
 	if p.Len() != 4 {
@@ -89,8 +89,8 @@ func TestCons(t *testing.T) {
 	if p.Third() != baz {
 		t.Errorf("expected 'baz', but got '%s'", p.Third())
 	}
-	if p.String() != "(foo bar baz qux)" {
-		t.Errorf("expected (foo bar baz qux) but got '%s'", p.String())
+	if p.String() != "(foo bar baz . qux)" {
+		t.Errorf("expected (foo bar baz . qux) but got '%s'", p.String())
 	}
 	p = p.Reverse()
 	if p.Len() != 4 {
@@ -105,7 +105,7 @@ func TestCons(t *testing.T) {
 	if p.Third() != bar {
 		t.Errorf("expected 'bar', but got '%s'", p.Third())
 	}
-	if p.String() != "(qux baz bar foo)" {
-		t.Errorf("expected (qux baz bar foo) but got '%s'", p.String())
+	if p.String() != "(qux baz bar . foo)" {
+		t.Errorf("expected (qux baz bar . foo) but got '%s'", p.String())
 	}
 }

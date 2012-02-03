@@ -102,19 +102,26 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected )")
 	case tokenString:
-		// TODO: decode string escapes
+		// TODO: decode string escapes; could use strconv.Unquote(string)
 		return t.contents(), nil
 	case tokenInteger:
 		return atoi(t.val)
 	case tokenFloat:
 		return atof(t.val)
-	case tokenSymbol:
-		// TODO: handle quotes (' ` , ,@)
-		if t.val == "#t" {
+	case tokenBoolean:
+		if t.val == "#t" || t.val == "#T" {
 			return true, nil
-		} else if t.val == "#f" {
+		} else {
+			// lexer already validated that it is #f or #F
 			return false, nil
 		}
+	case tokenCharacter:
+		// TODO: what is character used for?
+		return nil, NewLispError(ESYNTAX, t.val+" is unsupported")
+	case tokenQuote:
+		// TODO: handle quotes (' ` , ,@)
+		return nil, NewLispError(ESYNTAX, t.val+" is unsupported")
+	case tokenIdentifier:
 		return Symbol(t.val), nil
 	}
 	panic("unreachable code")
