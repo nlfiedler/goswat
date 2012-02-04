@@ -32,6 +32,79 @@ func TestPairNil(t *testing.T) {
 	}
 }
 
+func TestPairSingle(t *testing.T) {
+	foo := Symbol("foo")
+	p := NewPair(foo)
+	if p.Len() != 1 {
+		t.Errorf("expected 1, but got %d", p.Len())
+	}
+	if p.First() != foo {
+		t.Errorf("expected 'foo', but got '%s'", p.First())
+	}
+	if p.Second() != nil {
+		t.Errorf("expected nil, but got '%s'", p.Second())
+	}
+	if p.Third() != nil {
+		t.Errorf("expected nil, but got '%s'", p.Third())
+	}
+	if p.String() != "(foo)" {
+		t.Errorf("expected '(foo)' but got '%s'", p.String())
+	}
+	p = p.Reverse()
+	if p.Len() != 1 {
+		t.Errorf("expected 1, but got %d", p.Len())
+	}
+	if p.First() != foo {
+		t.Errorf("expected 'foo', but got '%s'", p.First())
+	}
+	if p.Second() != nil {
+		t.Errorf("expected nil, but got '%s'", p.Second())
+	}
+	if p.Third() != nil {
+		t.Errorf("expected nil, but got '%s'", p.Third())
+	}
+	if p.String() != "(foo)" {
+		t.Errorf("expected (foo) but got '%s'", p.String())
+	}
+}
+
+func TestCons(t *testing.T) {
+	foo := Symbol("foo")
+	bar := Symbol("bar")
+	p := Cons(foo, bar)
+	if p.Len() != 2 {
+		t.Errorf("expected 2, but got %d", p.Len())
+	}
+	if p.First() != foo {
+		t.Errorf("expected 'foo', but got '%s'", p.First())
+	}
+	if p.Second() != bar {
+		t.Errorf("expected 'bar', but got '%s'", p.Second())
+	}
+	if p.Third() != nil {
+		t.Errorf("expected nil, but got '%s'", p.Third())
+	}
+	if p.String() != "(foo . bar)" {
+		t.Errorf("expected '(foo . bar)' but got '%s'", p.String())
+	}
+	p = p.Reverse()
+	if p.Len() != 2 {
+		t.Errorf("expected 2, but got %d", p.Len())
+	}
+	if p.First() != bar {
+		t.Errorf("expected 'bar', but got '%s'", p.First())
+	}
+	if p.Second() != foo {
+		t.Errorf("expected 'foo', but got '%s'", p.Second())
+	}
+	if p.Third() != nil {
+		t.Errorf("expected nil, but got '%s'", p.Third())
+	}
+	if p.String() != "(bar . foo)" {
+		t.Errorf("expected (bar . foo) but got '%s'", p.String())
+	}
+}
+
 func TestList(t *testing.T) {
 	foo := Symbol("foo")
 	bar := Symbol("bar")
@@ -69,7 +142,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestCons(t *testing.T) {
+func TestConsMultiple(t *testing.T) {
 	foo := Symbol("foo")
 	bar := Symbol("bar")
 	baz := Symbol("baz")

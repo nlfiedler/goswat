@@ -11,7 +11,10 @@ import (
 )
 
 // emptyList represents an empty list and is used by Pair to
-// mark the end of a linked list.
+// mark the end of a linked list. This is needed because it seems
+// that Go does not handle variables of type interface{} that are
+// sometimes storing pointers, such that checking for nil always
+// returns false. This variable is effectively our nil pointer.
 var emptyList = "()"
 
 // Pair represents a pair of items, which themselves may be pairs.
@@ -20,12 +23,19 @@ type Pair struct {
 	rest  interface{} // the cdr of the pair
 }
 
-// Cons constructs a pair to hold item a and b.
+// NewPair returns an instance of Pair to hold the single element a.
+func NewPair(a interface{}) *Pair {
+	return &Pair{a, emptyList}
+}
+
+// Cons constructs a pair to hold item a and b such that they are stored
+// in a single instance of Pair.
 func Cons(a, b interface{}) *Pair {
 	return &Pair{a, b}
 }
 
-// List constructs a list to hold a and b.
+// List constructs a list to hold a and b such that a and b are in
+// distinct instances of Pair.
 func List(a, b interface{}) *Pair {
 	return &Pair{a, &Pair{b, emptyList}}
 }
@@ -99,10 +109,15 @@ func (p *Pair) Reverse() *Pair {
 			p = nil
 		}
 	}
+	// tighten up the end of the list
 	if penultimate != nil {
-		// tighten up the end of the list
 		if r, ok := penultimate.rest.(*Pair); ok {
 			penultimate.rest = r.first
+		}
+	} else if result != nil && result.rest != emptyList {
+		// special case of a single Pair
+		if r, ok := result.rest.(*Pair); ok {
+			result.rest = r.first
 		}
 	}
 	return result
