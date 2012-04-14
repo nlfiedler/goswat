@@ -26,21 +26,21 @@ const eof = unicode.UpperLower
 
 // token types
 const (
-	_               tokenType = iota // undefined
-	tokenError                       // error occurred
-	tokenString                      // string literal
-	tokenQuote                       // quoted list
-	tokenCharacter                   // character literal
-	tokenIdentifier                  // identifier token
-	tokenInteger                     // integer literal
-	tokenFloat                       // floating point literal
-	tokenComplex                     // complex number
-	tokenRational                    // rational number
-	tokenBoolean                     // boolean value (#t or #f)
-	tokenOpenParen                   // open parenthesis
-	tokenStartVector                 // beginning of vector
-	tokenCloseParen                  // close parenthesis
-	tokenEOF                         // end-of-file token
+	_                tokenType = iota // undefined
+	tokenError                        // error occurred
+	tokenString                       // string literal
+	tokenQuote                        // quoted list
+	tokenCharacter                    // character literal
+	tokenIdentifier                   // identifier token
+	tokenInteger                      // integer literal
+	tokenFloat                        // floating point literal
+	tokenComplex                      // complex number
+	tokenRational                     // rational number
+	tokenBoolean                      // boolean value (#t or #f)
+	tokenOpenParen                    // open parenthesis
+	tokenStartVector                  // beginning of vector
+	tokenCloseParen                   // close parenthesis
+	tokenEOF                          // end-of-file token
 )
 
 // token represents a token returned from the scanner.
@@ -435,7 +435,7 @@ func lexNumber(l *lexer) stateFn {
 			return fn
 		}
 		if l.accept("/") {
-			if pos - l.pos == 1 {
+			if pos-l.pos == 1 {
 				// there has to be something before the /
 				return l.errorf("malformed rational: %q", l.input[l.start:l.pos])
 			}

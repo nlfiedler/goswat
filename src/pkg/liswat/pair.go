@@ -105,7 +105,7 @@ func Cxr(name string, a interface{}) interface{} {
 		} else if name[i] == 'd' {
 			x = Cdr(x)
 		} else {
-			panic("unsupported function name: "+name)
+			panic("unsupported function name: " + name)
 		}
 	}
 	return x

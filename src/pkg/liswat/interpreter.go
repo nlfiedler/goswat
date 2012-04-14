@@ -74,9 +74,9 @@ func (e *Environment) Set(sym Symbol, val interface{}) *LispError {
 // Callable represents a procedure that can be invoked. It has an
 // environment in which the procedure was defined.
 type Callable struct {
-	body   *Pair        // procedure definition
-	params *Pair        // parameter list
-	env    Environment  // defining environment
+	body   *Pair       // procedure definition
+	params *Pair       // parameter list
+	env    Environment // defining environment
 }
 
 // NewCallable constructs a new Callable with the given definition,
@@ -101,39 +101,39 @@ func Eval(expr interface{}) (interface{}, *LispError) {
 // eval evaluates the given parse tree using a specific environment.
 func (e *Environment) eval(expr interface{}) (interface{}, *LispError) {
 	// TODO: implement eval
-    // while True:
-    // 	if isa(x, Symbol):       # variable reference
-    // 	    return env.find(x)[x]
-    // 	elif not isa(x, list):   # constant literal
-    // 	    return x
-    // 	elif x[0] is _quote:     # (quote exp)
-    // 	    (_, exp) = x
-    // 	    return exp
-    // 	elif x[0] is _if:        # (if test conseq alt)
-    // 	    (_, test, conseq, alt) = x
-    // 	    x = (conseq if eval(test, env) else alt)
-    // 	elif x[0] is _set:       # (set! var exp)
-    // 	    (_, var, exp) = x
-    // 	    env.find(var)[var] = eval(exp, env)
-    // 	    return None
-    // 	elif x[0] is _define:    # (define var exp)
-    // 	    (_, var, exp) = x
-    // 	    env[var] = eval(exp, env)
-    // 	    return None
-    // 	elif x[0] is _lambda:    # (lambda (var*) exp)
-    // 	    (_, vars, exp) = x
-    // 	    return Procedure(vars, exp, env)
-    // 	elif x[0] is _begin:     # (begin exp+)
-    // 	    for exp in x[1:-1]:
-    // 		eval(exp, env)
-    // 	    x = x[-1]
-    // 	else:                    # (proc exp*)
-    // 	    exps = [eval(exp, env) for exp in x]
-    // 	    proc = exps.pop(0)
-    // 	    if isa(proc, Procedure):
-    // 		x = proc.exp
-    // 		env = Env(proc.parms, exps, proc.env)
-    // 	    else:
-    // 		return proc(*exps)
+	// while True:
+	// 	if isa(x, Symbol):       # variable reference
+	// 	    return env.find(x)[x]
+	// 	elif not isa(x, list):   # constant literal
+	// 	    return x
+	// 	elif x[0] is _quote:     # (quote exp)
+	// 	    (_, exp) = x
+	// 	    return exp
+	// 	elif x[0] is _if:        # (if test conseq alt)
+	// 	    (_, test, conseq, alt) = x
+	// 	    x = (conseq if eval(test, env) else alt)
+	// 	elif x[0] is _set:       # (set! var exp)
+	// 	    (_, var, exp) = x
+	// 	    env.find(var)[var] = eval(exp, env)
+	// 	    return None
+	// 	elif x[0] is _define:    # (define var exp)
+	// 	    (_, var, exp) = x
+	// 	    env[var] = eval(exp, env)
+	// 	    return None
+	// 	elif x[0] is _lambda:    # (lambda (var*) exp)
+	// 	    (_, vars, exp) = x
+	// 	    return Procedure(vars, exp, env)
+	// 	elif x[0] is _begin:     # (begin exp+)
+	// 	    for exp in x[1:-1]:
+	// 		eval(exp, env)
+	// 	    x = x[-1]
+	// 	else:                    # (proc exp*)
+	// 	    exps = [eval(exp, env) for exp in x]
+	// 	    proc = exps.pop(0)
+	// 	    if isa(proc, Procedure):
+	// 		x = proc.exp
+	// 		env = Env(proc.parms, exps, proc.env)
+	// 	    else:
+	// 		return proc(*exps)
 	return nil, nil
 }

@@ -15,8 +15,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 // Symbol represents a variable or procedure name in a Scheme
@@ -93,7 +93,7 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 	case complex64, complex128:
 		// print the complex number without parens
 		str := fmt.Sprintf("%v", i)
-		buf.WriteString(str[1:len(str)-1])
+		buf.WriteString(str[1 : len(str)-1])
 	default:
 		// this also handles Pair
 		fmt.Fprintf(buf, "%v", i)
@@ -148,7 +148,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 			}
 		}
 		return nil, NewLispError(ELEXER, "unexpected EOF after open paren")
-// TODO: case tokenStartVector:
+		// TODO: case tokenStartVector:
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected )")
 	case tokenString:
@@ -208,9 +208,9 @@ func atof(text string) (float64, *LispError) {
 		// handle #e and #i prefixes for exactness
 		switch text[1] {
 		case 'e', 'E':
-			return 0.0, NewLispError(ESUPPORT, "exactness prefix unsupported: " + text)
+			return 0.0, NewLispError(ESUPPORT, "exactness prefix unsupported: "+text)
 		case 'i', 'I':
-			return 0.0, NewLispError(ESUPPORT, "exactness prefix unsupported: " + text)
+			return 0.0, NewLispError(ESUPPORT, "exactness prefix unsupported: "+text)
 		default:
 			// the lexer messed up if this happens
 			return 0.0, NewLispError(EINVALNUM, text)
@@ -309,7 +309,7 @@ func atoc(text string) (interface{}, *LispError) {
 			reel = 0.0
 		}
 		var imaj float64
-		ip := text[split:len(text)-1]
+		ip := text[split : len(text)-1]
 		if ip == "+" {
 			imaj = 1.0
 		} else if ip == "-" {
@@ -349,7 +349,7 @@ func ator(text string) (interface{}, *LispError) {
 // selected parser token, with the clarifying message.
 func newParserError(err int, elem interface{}, msg string) *LispError {
 	str := stringify(elem)
-	return NewLispError(err, msg + ": " + str)
+	return NewLispError(err, msg+": "+str)
 }
 
 // expandListSafely calls expand() on each element of the given list and
@@ -531,7 +531,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 // expandQuasiquote processes the quotes, expanding the quoted elements.
 func expandQuasiquote(x interface{}) (interface{}, *LispError) {
 	// Expand `x => 'x; `,x => x; `(,@x y) => (append x y)
-// TODO: this is not Scheme compliant and needs to be rewritten
+	// TODO: this is not Scheme compliant and needs to be rewritten
 	pair, ispair := x.(*Pair)
 	if !ispair || pair.Len() == 0 {
 		return NewList(quoteSym, x), nil
