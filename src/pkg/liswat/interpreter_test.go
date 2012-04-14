@@ -13,7 +13,7 @@ import (
 func TestEnvironment(t *testing.T) {
 	e := NewEnvironment(nil)
 	if e == nil {
-		t.Errorf("constructing new environment failed")
+		t.Fatalf("constructing new environment failed")
 	}
 	foo := Symbol("foo")
 	v := e.Find(foo)
@@ -37,7 +37,7 @@ func TestEnvironmentParent(t *testing.T) {
 	p.Define(foo, "bar")
 	e := NewEnvironment(p)
 	if e == nil {
-		t.Errorf("constructing new environment failed")
+		t.Fatalf("constructing new environment failed")
 	}
 	v := e.Find(foo)
 	if v != "bar" {
@@ -65,7 +65,7 @@ func TestEnvironmentOverride(t *testing.T) {
 	p.Define(foo, "bar")
 	e := NewEnvironment(p)
 	if e == nil {
-		t.Errorf("constructing new environment failed")
+		t.Fatalf("constructing new environment failed")
 	}
 	e.Define(foo, "qux")
 	if e.Find(foo) != "qux" {
@@ -75,3 +75,6 @@ func TestEnvironmentOverride(t *testing.T) {
 		t.Errorf("expected parent-defined var to return 'bar'")
 	}
 }
+
+// TODO: test Callable
+// TODO: test Eval()

@@ -16,9 +16,11 @@ const (
 	EOK       // no error
 	ESYNTAX   // syntax error (e.g. unexpected close parenthesis)
 	EVARUNDEF // variable not defined
+	EBADTYPE  // found wrong type of value (e.g. not a procedure when one was expected)
 	EINVALNUM // invalid numeric expression
 	ENUMRANGE // numeric value out of supported range
 	ELEXER    // lexer tokenization failed
+	ESUPPORT  // feature unsupported
 )
 
 // LispError is used to provide information on the type of error that

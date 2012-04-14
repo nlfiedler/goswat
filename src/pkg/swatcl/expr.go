@@ -450,9 +450,8 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 	// TODO: get the evaluator working for nested commands
 	// TODO: get the evaluator working for function invocation
 
-	for {
-		// pull tokens from lexer, building expression tree
-		token := <-c
+	// pull tokens from lexer, building expression tree
+	for token := range c {
 		if token.typ == tokenError {
 			return "", NewTclError(ELEXER, token.val)
 

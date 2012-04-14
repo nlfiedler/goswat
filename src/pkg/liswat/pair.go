@@ -10,12 +10,24 @@ import (
 	"bytes"
 )
 
-// emptyList represents an empty list and is used by Pair to
-// mark the end of a linked list. This is needed because it seems
-// that Go does not handle variables of type interface{} that are
-// sometimes storing pointers, such that checking for nil always
-// returns false. This variable is effectively our nil pointer.
-var emptyList = "()"
+// EmptyList is a type unto itself, representing the "empty" value in
+// Scheme, as well as marking the end of lists.
+type EmptyList int
+
+// Len returns the length of the empty list, which is always zero.
+func (e EmptyList) Len() int {
+	return 0
+}
+
+// String returns the string representation of the empty list, which is
+// always "()".
+func (e EmptyList) String() string {
+	return "()"
+}
+
+// emptyList represents an empty list and may be used as a place holder
+// in expressions that require a certain number of values.
+var emptyList EmptyList = EmptyList(0)
 
 // Pair represents a pair of items, which themselves may be pairs.
 type Pair struct {
@@ -28,6 +40,22 @@ func NewPair(a interface{}) *Pair {
 	return &Pair{a, emptyList}
 }
 
+// NewList constructs a list of pairs from the given inputs.
+func NewList(a ...interface{}) *Pair {
+	var head *Pair = nil
+	var prev *Pair = nil
+	for _, v := range a {
+		next := Cons(v, emptyList)
+		if head == nil {
+			head = next
+		} else {
+			prev.rest = next
+		}
+		prev = next
+	}
+	return head
+}
+
 // Cons constructs a pair to hold item a and b such that they are stored
 // in a single instance of Pair.
 func Cons(a, b interface{}) *Pair {
@@ -38,6 +66,102 @@ func Cons(a, b interface{}) *Pair {
 // distinct instances of Pair.
 func List(a, b interface{}) *Pair {
 	return &Pair{a, &Pair{b, emptyList}}
+}
+
+// Car returns the first element in a list.
+func Car(a interface{}) interface{} {
+	if a == emptyList {
+		return nil
+	} else if p, ok := a.(*Pair); ok {
+		return p.first
+	} else {
+		return nil
+	}
+	panic("unreachable code")
+}
+
+// Cdr returns the second element in a list.
+func Cdr(a interface{}) interface{} {
+	if a == emptyList {
+		return nil
+	} else if p, ok := a.(*Pair); ok {
+		if p.rest == emptyList {
+			return nil
+		}
+		return p.rest
+	} else {
+		return nil
+	}
+	panic("unreachable code")
+}
+
+// Cxr implements all of the caar, cadr, ... cddddr procedures defined
+// in Scheme, where name is the name of the procedure to process.
+func Cxr(name string, a interface{}) interface{} {
+	x := a
+	for i := len(name) - 2; x != nil && i >= 1; i-- {
+		if name[i] == 'a' {
+			x = Car(x)
+		} else if name[i] == 'd' {
+			x = Cdr(x)
+		} else {
+			panic("unsupported function name: "+name)
+		}
+	}
+	return x
+}
+
+// Append adds the given item to the pair, forming a list.
+func (p *Pair) Append(a interface{}) {
+	if p == nil {
+		// cannot append to nil
+		return
+	} else if p.rest == emptyList {
+		p.rest = Cons(a, p.rest)
+	} else if r, ok := p.rest.(*Pair); ok {
+		// find the end of the list and append there
+		for r != nil {
+			if r.rest == emptyList {
+				r.rest = Cons(a, r.rest)
+				break
+			} else if rr, ok := r.rest.(*Pair); ok {
+				r = rr
+			} else {
+				r.rest = Cons(r.rest, a)
+				break
+			}
+		}
+	} else {
+		// make a new pair to hold rest and a
+		p.rest = Cons(p.rest, a)
+	}
+}
+
+// Join connects the given object to this pair, forming one list.
+// Unlike Append(), this does not convert the object into a pair.
+func (p *Pair) Join(a interface{}) {
+	if p == nil {
+		// cannot join to nil
+		return
+	} else if p.rest == emptyList {
+		p.rest = a
+	} else if r, ok := p.rest.(*Pair); ok {
+		// find the end of the list and attach there
+		for r != nil {
+			if r.rest == emptyList {
+				r.rest = a
+				break
+			} else if rr, ok := r.rest.(*Pair); ok {
+				r = rr
+			} else {
+				r.rest = Cons(r.rest, a)
+				break
+			}
+		}
+	} else {
+		// make a new pair to hold rest and a
+		p.rest = Cons(p.rest, a)
+	}
 }
 
 // First returns the first item in the pair.
@@ -139,6 +263,33 @@ func (p *Pair) Len() int {
 		}
 	}
 	return length
+}
+
+// Map calls function f on each element of the pair, returning
+// a new pair constructed from the values returned by f().
+func (p *Pair) Map(f func(interface{}) interface{}) *Pair {
+	var head *Pair = nil
+	var prev *Pair = nil
+	for p != nil {
+		q := f(p.first)
+		var s interface{} = emptyList
+		if p.rest == emptyList {
+			p = nil
+		} else if r, ok := p.rest.(*Pair); ok {
+			p = r
+		} else {
+			s = f(p.rest)
+			p = nil
+		}
+		next := Cons(q, s)
+		if head == nil {
+			head = next
+		} else {
+			prev.rest = next
+		}
+		prev = next
+	}
+	return head
 }
 
 // String returns the string form of the pair.

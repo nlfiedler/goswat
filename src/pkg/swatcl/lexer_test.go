@@ -25,11 +25,8 @@ type expectedLexerError struct {
 
 // drainLexerChannel reads from the given channel until it closes.
 func drainLexerChannel(c chan token) {
-	for {
-		_, ok := <-c
-		if !ok {
-			break
-		}
+	for _ = range c {
+		// loop until channel is closed
 	}
 }
 

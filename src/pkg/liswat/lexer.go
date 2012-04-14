@@ -34,8 +34,11 @@ const (
 	tokenIdentifier                  // identifier token
 	tokenInteger                     // integer literal
 	tokenFloat                       // floating point literal
+	tokenComplex                     // complex number
+	tokenRational                    // rational number
 	tokenBoolean                     // boolean value (#t or #f)
 	tokenOpenParen                   // open parenthesis
+	tokenStartVector                 // beginning of vector
 	tokenCloseParen                  // close parenthesis
 	tokenEOF                         // end-of-file token
 )
@@ -113,6 +116,12 @@ type lexer struct {
 	tokens chan token // channel of scanned tokens.
 }
 
+// String returns a string representation of the lexer, useful for
+// debugging.
+func (l *lexer) String() string {
+	return fmt.Sprintf("%s: '%s' [%d:%d]", l.name, l.input[l.start:l.pos], l.start, l.pos)
+}
+
 // stateFn represents the state of the scanner as a function that
 // returns the next state.
 type stateFn func(*lexer) stateFn
@@ -188,10 +197,12 @@ func (l *lexer) accept(valid string) bool {
 }
 
 // acceptRun consumes a run of runes from the valid set.
-func (l *lexer) acceptRun(valid string) {
+func (l *lexer) acceptRun(valid string) bool {
+	pos := l.pos
 	for strings.ContainsRune(valid, l.next()) {
 	}
 	l.backup()
+	return pos < l.pos
 }
 
 // errorf returns an error token and terminates the scan by passing back
@@ -321,7 +332,8 @@ func lexIdentifier(l *lexer) stateFn {
 
 	} else if r == '+' || r == '-' {
 		// +/- must be whitespace delimited to be a identifier
-		if unicode.IsDigit(l.peek()) {
+		r = l.peek()
+		if unicode.IsDigit(r) || r == 'i' || r == 'I' {
 			l.rewind()
 			return lexNumber
 		}
@@ -356,45 +368,126 @@ func lexIdentifier(l *lexer) stateFn {
 }
 
 // lexNumber expects the current position to be the start of a numeric
-// literal, and advances to the end of the literal.
+// literal, and advances to the end of the literal. It will parse both
+// integer and floating point decimal values.
 func lexNumber(l *lexer) stateFn {
 
 	//
-	// Can expect integer in octal, decimal, or hexadecimal, as well
-	// as floating point, with optional exponent. A leading sign is
-	// also permitted (+ or -)
+	// See r5rs 7.1.1 for detailed format for numeric constants
 	//
-	// 1
-	// 2.1
-	// 3.
-	// 6E4
-	// 7.91e+16
-	// .000001
-	// 0366 (octal)
-	// 0x7b5 (hexadecimal)
-	//
-
-	l.accept("+-")
 	float := false
-	if l.accept("0") && l.accept("xX") {
-		// hexadecimal
-		l.acceptRun("0123456789abcdefABCDEF")
-	} else if l.accept("0") && !l.accept(".") {
-		// octal
-		l.acceptRun("01234567")
-	} else {
-		// decimal, possibly floating point
-		digits := "0123456789"
-		l.acceptRun(digits)
-		if l.accept(".") {
-			float = true
-			l.acceptRun(digits)
+	cmplx := false
+	rational := false
+	exact := true
+	digits := "0123456789"
+
+	// returns nil if okay, otherwise the error state function
+	acceptPrefixR := func(l *lexer) stateFn {
+		// we expect either exactness, radix, or both, in any order;
+		// however, if we see more than one of either, that's an error
+		baseSet := 0
+		exactnessSet := 0
+		for l.accept("#") {
+			r := l.next()
+			switch r {
+			case 'd', 'D':
+				baseSet++
+			case 'b', 'B':
+				baseSet++
+				digits = "01"
+			case 'o', 'O':
+				baseSet++
+				digits = "01234567"
+			case 'x', 'X':
+				baseSet++
+				digits = "0123456789abcdefABCDEF"
+			case 'e', 'E':
+				exactnessSet++
+			case 'i', 'I':
+				exactnessSet++
+			default:
+				// unrecognized letter, signal an error
+				baseSet = 10
+			}
 		}
-		if l.accept("eE") {
+		if baseSet > 1 || exactnessSet > 1 {
+			return l.errorf("malformed number prefix: %q", l.input[l.start:l.pos])
+		}
+		return nil
+	}
+
+	// returns nil if okay, otherwise the error state function
+	acceptUintegerR := func(tentative bool, l *lexer) stateFn {
+		ok := l.acceptRun(digits)
+		if !tentative && !ok {
+			return l.errorf("malformed number: %q", l.input[l.start:l.pos])
+		}
+		if l.acceptRun("#") {
+			exact = false
+		}
+		return nil
+	}
+
+	// returns nil if okay, otherwise the error state function
+	acceptUrealR := func(tentative bool, l *lexer) stateFn {
+		pos := l.pos
+		if fn := acceptUintegerR(tentative, l); fn != nil {
+			return fn
+		}
+		if l.accept("/") {
+			if pos - l.pos == 1 {
+				// there has to be something before the /
+				return l.errorf("malformed rational: %q", l.input[l.start:l.pos])
+			}
+			rational = true
+			if fn := acceptUintegerR(false, l); fn != nil {
+				return fn
+			}
+		} else if len(digits) == 10 && l.accept(".") {
+			float = true
+			if exact {
+				l.acceptRun(digits)
+			} else {
+				l.acceptRun("#")
+			}
+		}
+		if l.accept("dDeEfFlLsS") {
 			float = true
 			l.accept("+-")
 			l.acceptRun(digits)
 		}
+		return nil
+	}
+
+	// returns nil if okay, otherwise the error state function
+	acceptRealR := func(tentative bool, l *lexer) stateFn {
+		l.accept("+-")
+		return acceptUrealR(tentative, l)
+	}
+
+	// scan for a scheme number
+	if fn := acceptPrefixR(l); fn != nil {
+		return fn
+	}
+	if fn := acceptRealR(true, l); fn != nil {
+		return fn
+	}
+	if l.accept("@") {
+		cmplx = true
+		if fn := acceptRealR(false, l); fn != nil {
+			return fn
+		}
+	} else if l.accept("+-") {
+		cmplx = true
+		if fn := acceptUrealR(true, l); fn != nil {
+			return fn
+		}
+		if !l.accept("iI") {
+			return l.errorf("malformed complex: %q", l.input[l.start:l.pos])
+		}
+	}
+	if l.accept("iI") {
+		cmplx = true
 	}
 
 	// Next thing must _not_ be alphanumeric.
@@ -402,7 +495,11 @@ func lexNumber(l *lexer) stateFn {
 		l.next()
 		return l.errorf("malformed number: %q", l.input[l.start:l.pos])
 	}
-	if float {
+	if cmplx {
+		l.emit(tokenComplex)
+	} else if rational {
+		l.emit(tokenRational)
+	} else if float {
 		l.emit(tokenFloat)
 	} else {
 		l.emit(tokenInteger)
@@ -423,11 +520,12 @@ func lexHash(l *lexer) stateFn {
 		l.emit(tokenBoolean)
 		return lexStart
 	case '(':
-		// TODO: handle converting list to vector
-		return nil
-	case 'e', 'i', 'd', 'b', 'o', 'x':
-		// TODO: handle numeric notation
-		return nil
+		l.emit(tokenStartVector)
+		return lexStart
+	case 'b', 'd', 'e', 'i', 'o', 'x':
+		// let lexNumber sort out the prefix
+		l.rewind()
+		return lexNumber
 	case '\\':
 		// check if 'space' or 'newline'
 		l.acceptRun("aceilnpsw")
@@ -462,7 +560,7 @@ func lexHash(l *lexer) stateFn {
 
 // lexQuote processes the special quoting characters.
 func lexQuote(l *lexer) stateFn {
-	// we already know its one of the quoting characters, just need
+	// we already know it's one of the quoting characters, just need
 	// to check if it is the two character ,@ form
 	l.backup()
 	r := l.next()
