@@ -36,13 +36,13 @@ func TestVectorNums(t *testing.T) {
 	var v Vector
 	c := int(0)
 	runtime.GC()
-	m0 := runtime.MemStats
+	m0 := new(runtime.MemStats)
 	v.Resize(memTestN, memTestN)
 	for i := 0; i < memTestN; i++ {
 		v.Set(i, c)
 	}
 	runtime.GC()
-	m := runtime.MemStats
+	m := new(runtime.MemStats)
 	v.Resize(0, 0)
 	runtime.GC()
 	n := m.Alloc - m0.Alloc
@@ -56,13 +56,13 @@ func TestIntVectorNums(t *testing.T) {
 	var v IntVector
 	c := int(0)
 	runtime.GC()
-	m0 := runtime.MemStats
+	m0 := new(runtime.MemStats)
 	v.Resize(memTestN, memTestN)
 	for i := 0; i < memTestN; i++ {
 		v.Set(i, c)
 	}
 	runtime.GC()
-	m := runtime.MemStats
+	m := new(runtime.MemStats)
 	v.Resize(0, 0)
 	runtime.GC()
 	n := m.Alloc - m0.Alloc
@@ -76,13 +76,13 @@ func TestStringVectorNums(t *testing.T) {
 	var v StringVector
 	c := ""
 	runtime.GC()
-	m0 := runtime.MemStats
+	m0 := new(runtime.MemStats)
 	v.Resize(memTestN, memTestN)
 	for i := 0; i < memTestN; i++ {
 		v.Set(i, c)
 	}
 	runtime.GC()
-	m := runtime.MemStats
+	m := new(runtime.MemStats)
 	v.Resize(0, 0)
 	runtime.GC()
 	n := m.Alloc - m0.Alloc

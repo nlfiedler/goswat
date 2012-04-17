@@ -8,7 +8,6 @@ package swatcl
 
 import (
 	"bytes"
-	"os"
 	"strconv"
 	"strings"
 	"unicode"
@@ -48,11 +47,11 @@ func coerceNumber(expr string) (interface{}, *TclError) {
 func atof(text string) (interface{}, *TclError) {
 	v, err := strconv.ParseFloat(text, 64)
 	if err != nil {
-		if err == os.EINVAL {
+		if err == strconv.ErrSyntax {
 			// the parser messed up if this happens
 			return "", NewTclError(EINVALNUM, text)
 		}
-		if err == os.ERANGE {
+		if err == strconv.ErrRange {
 			return "", NewTclError(ENUMRANGE, text)
 		}
 	}
@@ -66,11 +65,11 @@ func atoi(text string) (interface{}, *TclError) {
 	// (either binary, decimal, or hexadecimal)
 	v, err := strconv.ParseInt(text, 0, 64)
 	if err != nil {
-		if err == os.EINVAL {
+		if err == strconv.ErrSyntax {
 			// the parser messed up if this happens
 			return "", NewTclError(EINVALNUM, text)
 		}
-		if err == os.ERANGE {
+		if err == strconv.ErrRange {
 			return "", NewTclError(ENUMRANGE, text)
 		}
 	}

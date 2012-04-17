@@ -23,7 +23,7 @@ package swatcl
 //
 
 import (
-	"container/vector"
+	"code.google.com/p/goswat/container/vector"
 	"fmt"
 )
 
