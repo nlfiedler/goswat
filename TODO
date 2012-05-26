@@ -1,13 +1,6 @@
 GoSwat Checklist (-*- text -*-)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Add the following to the main wiki page
-  % go get code.google.com/p/goswat
-  % go install code.google.com/p/goswat/container/vector
-  % go test code.google.com/p/goswat/liswat
-  % go test code.google.com/p/goswat/swatcl
-  % go install code.google.com/p/goswat
-  % ./bin/goswat
 - Finish the Scheme and Tcl interpreters
 - Utilize one of the following to facilitate a psuedo GUI in the console
   - https://github.com/nsf/termbox
