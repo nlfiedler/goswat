@@ -57,7 +57,7 @@ func main() {
 	logSysInfo()
 	welmsg := `Welcome to GoSwat! To get started, try the 'help' command.
 Use 'exit' or Ctrl-c to exit the debugger.`
-//Startup commands can be placed in ".goswatrc" in ~ or .`
+	//Startup commands can be placed in ".goswatrc" in ~ or .`
 	fmt.Println(welmsg)
 	// TODO: initialize the liswat and swatcl environments
 	// TODO: initialize and set up the curses-based interface
@@ -111,7 +111,7 @@ func setupLogging() {
 		}
 	}
 	logname := filepath.Join(goswatdir, "messages.log")
-	logfile, err := os.OpenFile(logname, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0644)
+	logfile, err := os.OpenFile(logname, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalln(err)
 	}
