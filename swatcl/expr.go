@@ -57,6 +57,13 @@ type Evaluator interface {
 	evaluate() (interface{}, *TclError)
 }
 
+// ExprNode represents a node in the expression tree that can be evaluated
+// to a final value.
+type ExprNode interface {
+	Evaluator
+	getText() string
+}
+
 // exprNode contains the attributes of an expression node, whether it
 // is a numeric or string literal, or a command or variable reference.
 type exprNode struct {
@@ -68,6 +75,15 @@ type exprNode struct {
 // newExprNode creates a new expression node based on the token and text.
 func newExprNode(eval *evaluator, token token) *exprNode {
 	return &exprNode{token.typ, token.contents(), eval}
+}
+
+// getText returns the original text of the node.
+func (n *exprNode) getText() string {
+	return n.text
+}
+
+func (n *exprNode) String() string {
+	return n.text
 }
 
 // evaluate evaluates the expression node appropriately based on its type.
@@ -126,6 +142,34 @@ func newEvaluator(interp *Interpreter) *evaluator {
 	return e
 }
 
+// dumpStacks prints the contents of the operator and argument stacks to the
+// console, useful for debugging the expression evaluator.
+func (e *evaluator) dumpStacks() {
+        fmt.Println("Argument stack...")
+	if e.arguments.Len() == 0 {
+		fmt.Println("(empty)")
+	}
+        for ii := e.arguments.Len() - 1; ii >= 0; ii-- {
+		node, ok := e.arguments.At(ii).(ExprNode)
+		if !ok {
+			fmt.Printf("%d: not an ExprNode!", ii)
+		}
+		fmt.Printf("%d: %v (%T)\n", ii, node, node)
+        }
+
+        fmt.Println("\nOperator stack...")
+	if e.operators.Len() == 0 {
+		fmt.Println("(empty)")
+	}
+        for ii := e.operators.Len() - 1; ii >= 0; ii-- {
+		node, ok := e.operators.At(ii).(ExprNode)
+		if !ok {
+			fmt.Printf("%d: not an ExprNode!", ii)
+		}
+		fmt.Printf("%d: %v (%T)\n", ii, node, node)
+        }
+}
+
 // Reduce the operator stack by one. If the operator stack top is a left
 // parenthesis, no change is made.
 func (e *evaluator) reduce() *TclError {
@@ -136,39 +180,42 @@ func (e *evaluator) reduce() *TclError {
 	// node, which is then pushed back on the argument stack. Note
 	// that the trees on the argument stack represent the right and
 	// left arguments, respectively.
-	top, ok := e.operators.Pop().(*operatorNode)
+	top, ok := e.operators.Pop().(OperatorNode)
 	if !ok {
 		return NewTclError(EBADSTATE, "node on operator stack is not an operator!")
 	}
-	if top.sentinel {
+	if top.isSentinel() {
 		// Cleverly do nothing and let the caller handle it.
-	} else if top.arity == 2 {
+	} else if top.getArity() == 2 {
 		if e.arguments.Len() < 2 {
+			e.dumpStacks()
 			return NewTclError(EOPERAND, "operator requires two arguments")
 		}
-		arg2, ok := e.arguments.Pop().(*exprNode)
+		arg2, ok := e.arguments.Pop().(ExprNode)
 		if !ok {
 			return NewTclError(EBADSTATE, "second argument is not an exprNode!")
 		}
-		arg1, ok := e.arguments.Pop().(*exprNode)
+		arg1, ok := e.arguments.Pop().(ExprNode)
 		if !ok {
 			return NewTclError(EBADSTATE, "first argument is not an exprNode!")
 		}
-		top.left = arg1
-		top.right = arg2
+		top.setLeft(arg1)
+		top.setRight(arg2)
 		e.arguments.Push(top)
-	} else if top.arity == 1 {
+	} else if top.getArity() == 1 {
 		if e.arguments.Len() < 1 {
 			return NewTclError(EOPERAND, "operator requires one argument")
 		}
-		arg, ok := e.arguments.Pop().(*exprNode)
+		node := e.arguments.Pop()
+		arg, ok := node.(ExprNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "single argument is not an exprNode!")
+			msg := fmt.Sprintf("expected exprNode for single argument, got %T", node)
+			return NewTclError(EBADSTATE, msg)
 		}
-		top.right = arg
+		top.setRight(arg)
 		e.arguments.Push(top)
 	} else {
-		return NewTclError(EOPERATOR, "unknown operator "+top.text)
+		return NewTclError(EOPERATOR, "unknown operator "+top.getText())
 	}
 	return nil
 }
@@ -183,7 +230,7 @@ func (e *evaluator) handleEOF() *TclError {
 
 	count := 0
 	for e.operators.Len() > 0 {
-		top, ok := e.operators.Last().(*operatorNode)
+		top, ok := e.operators.Last().(OperatorNode)
 		if !ok {
 			return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
 		}
@@ -195,7 +242,7 @@ func (e *evaluator) handleEOF() *TclError {
 		//     setError(Errors.UNMATCHED_LBRACKET, top.getToken());
 		//     return;
 		// } else
-		if top.sentinel {
+		if top.isSentinel() {
 			return NewTclError(EBADEXPR, "sentinel operator encountered")
 		}
 		err := e.reduce()
@@ -417,16 +464,16 @@ func (e *evaluator) handleComma() *TclError {
 		if e.operators.Len() < 2 {
 			return NewTclError(EBADEXPR, "found comma outside function call")
 		}
-		top, ok := e.operators.Last().(*operatorNode)
+		top, ok := e.operators.Last().(OperatorNode)
 		if !ok {
 			return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
 		}
-		for !top.sentinel {
+		for !top.isSentinel() {
 			err := e.reduce()
 			if err != nil {
 				return err
 			}
-			top, ok = e.operators.Last().(*operatorNode)
+			top, ok = e.operators.Last().(OperatorNode)
 			if !ok {
 				return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
 			}
@@ -485,12 +532,12 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 			// (or equal precedence: this will force left associativity).
 			// Otherwise reduce the two stacks.
 			if e.operators.Len() > 0 {
-				top, ok := e.operators.Last().(*operatorNode)
+				top, ok := e.operators.Last().(OperatorNode)
 				if !ok {
 					return "", NewTclError(EBADSTATE,
 						"node on operator stack is not an operatorNode!")
 				}
-				if !top.sentinel && node.precedence >= top.precedence {
+				if !top.isSentinel() && node.getPrecedence() >= top.getPrecedence() {
 					err := e.reduce()
 					if err != nil {
 						return "", err

@@ -10,13 +10,22 @@ import (
 	"fmt"
 )
 
+type OperatorNode interface {
+	ExprNode
+	getArity() int
+	getPrecedence() int
+	isSentinel() bool
+	setLeft(left ExprNode)
+	setRight(right ExprNode)
+}
+
 // operatoreNode represents an operator (e.g. +, &) in Tcl. It has
 // an arity (e.g. binary, unary) and a precedence.
 type operatorNode struct {
 	exprNode
 	arity      int       // 1 for unary, 2 for binary
-	left       *exprNode // left child node
-	right      *exprNode // right child node
+	left       ExprNode  // left child node
+	right      ExprNode  // right child node
 	precedence int       // operator precedence (with 1 being the highest)
 	sentinel   bool      // true if this is a sentinel node (e.g. left parenthesis)
 }
@@ -29,40 +38,65 @@ func newOperatorNode(eval *evaluator, token token, arity int) *operatorNode {
 	node := &operatorNode{exprNode{token.typ, text, eval}, arity, nil, nil, 0, false}
 	// determine operator precedence
 	switch text {
-	case "~", "!":
-		node.precedence = 13
-	case "**":
-		node.precedence = 12
-	case "*", "/", "%":
-		node.precedence = 11
-	case "+", "-":
-		if arity == 1 {
-			node.precedence = 13
-		} else {
-			node.precedence = 10
-		}
-	case "<<", ">>":
-		node.precedence = 9
-	case "<", ">", "<=", ">=":
-		node.precedence = 8
-	case "eq", "ne", "in", "ni":
-		node.precedence = 7
-	case "&":
-		node.precedence = 6
-	case "^":
-		node.precedence = 5
-	case "|":
+	case "~", "!": // bitwise/logical complement?
 		node.precedence = 4
-	case "&&":
-		node.precedence = 3
-	case "||":
-		node.precedence = 2
-	case "?":
-		node.precedence = 1
+	case "**": // power??
+		node.precedence = 5
+	case "*", "/", "%": // multiplicative
+		node.precedence = 6
+	case "+", "-": // additive
+		if arity == 1 {
+			node.precedence = 4
+		} else {
+			node.precedence = 7
+		}
+	case "<<", ">>": // shift
+		node.precedence = 8
+	case "<", ">", "<=", ">=": // relational
+		node.precedence = 9
+	case "eq", "ne", "in", "ni":
+		node.precedence = 10
+	case "&": // bitwise AND
+		node.precedence = 11
+	case "^": // bitwise exclusive OR
+		node.precedence = 12
+	case "|": // bitwise inclusive OR
+		node.precedence = 13
+	case "&&": // logical AND
+		node.precedence = 14
+	case "||": // logical OR
+		node.precedence = 15
+	case "?": // ternary
+		node.precedence = 16
 	default:
 		node.precedence = -1
 	}
 	return node
+}
+
+func (o *operatorNode) String() string {
+	return fmt.Sprintf("'%s' binary: %t, precedence = %d",
+		o.text, o.arity == 2, o.precedence)
+}
+
+func (o *operatorNode) getArity() int {
+	return o.arity
+}
+
+func (o *operatorNode) getPrecedence() int {
+	return o.precedence
+}
+
+func (o *operatorNode) isSentinel() bool {
+	return o.sentinel
+}
+
+func (o *operatorNode) setLeft(left ExprNode) {
+	o.left = left
+}
+
+func (o *operatorNode) setRight(right ExprNode) {
+	o.right = right
 }
 
 func (o *operatorNode) evaluate() (interface{}, *TclError) {
