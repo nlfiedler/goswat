@@ -31,6 +31,7 @@ const (
 	ECOMMAND  // error related to commands
 )
 
+// TODO: read http://golang.org/doc/go_faq.html#nil_error and change all this
 // TclError is used to provide information on the type of error that
 // occurred while parsing or evaluating the Tcl script. It implements
 // the error interface.
