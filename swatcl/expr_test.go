@@ -66,3 +66,23 @@ func TestExprString(t *testing.T) {
 	values["{foo\\nbar}"] = "foo\\nbar"
 	evaluateAndCompare(i, values, t)
 }
+
+func TestMissingParen(t *testing.T) {
+	i := NewInterpreter()
+	_, e := EvaluateExpression(i, "(1 + 2")
+	if e == nil {
+		t.Error("expected missing close paren to fail")
+	}
+	_, e = EvaluateExpression(i, "1 + 2)")
+	if e == nil {
+		t.Error("expected missing open paren to fail")
+	}
+}
+
+func TestFunctions(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["abs(1)"] = "1"
+	values["abs(-1)"] = "1"
+	evaluateAndCompare(i, values, t)
+}

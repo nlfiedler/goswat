@@ -23,14 +23,12 @@ type OperatorNode interface {
 // an arity (e.g. binary, unary) and a precedence.
 type operatorNode struct {
 	exprNode
-	arity      int       // 1 for unary, 2 for binary
-	left       ExprNode  // left child node
-	right      ExprNode  // right child node
-	precedence int       // operator precedence (with 1 being the highest)
-	sentinel   bool      // true if this is a sentinel node (e.g. left parenthesis)
+	arity      int      // 1 for unary, 2 for binary
+	left       ExprNode // left child node
+	right      ExprNode // right child node
+	precedence int      // operator precedence (with 1 being the highest)
+	sentinel   bool     // true if this is a sentinel node (e.g. left parenthesis)
 }
-
-// TODO: left paren is an operator node with precedence of 1 and a sentinel flag
 
 // newOperatorNode constructs an operator node based on the given attributes.
 func newOperatorNode(eval *evaluator, token token, arity int) *operatorNode {
@@ -38,6 +36,9 @@ func newOperatorNode(eval *evaluator, token token, arity int) *operatorNode {
 	node := &operatorNode{exprNode{token.typ, text, eval}, arity, nil, nil, 0, false}
 	// determine operator precedence
 	switch text {
+	case "(", ")":
+		node.precedence = 1
+		node.sentinel = true
 	case "~", "!": // bitwise/logical complement?
 		node.precedence = 4
 	case "**": // power??
@@ -75,7 +76,7 @@ func newOperatorNode(eval *evaluator, token token, arity int) *operatorNode {
 }
 
 func (o *operatorNode) String() string {
-	return fmt.Sprintf("'%s' binary: %t, precedence = %d",
+	return fmt.Sprintf("'%s' binary: %t, precedence: %d",
 		o.text, o.arity == 2, o.precedence)
 }
 

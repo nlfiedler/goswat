@@ -19,7 +19,7 @@ const (
 	EVARUNDEF // variable not defined
 	ECMDUNDEF // command not defined
 	ENOSTACK  // no call frames on the stack
-	EILLARG   // interpreter given illegal method arguments
+	EILLARG   // interpreter given illegal function arguments
 	EBADBOOL  // interpreter given a malformed boolean value
 	EBADEXPR  // invalid characters in expression
 	EOPERAND  // missing or malformed operand
@@ -29,6 +29,8 @@ const (
 	ENUMRANGE // numeric value out of supported range
 	ELEXER    // lexer tokenization failed
 	ECOMMAND  // error related to commands
+	EPAREN    // parenthesis mismatch
+	ENOFUNC   // no such Tcl function
 )
 
 // TODO: read http://golang.org/doc/go_faq.html#nil_error and change all this

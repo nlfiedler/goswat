@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Nathan Fiedler. All rights reserved.
+// Copyright 2011-2012 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -26,19 +26,6 @@ import (
 	"code.google.com/p/goswat/container/vector"
 	"fmt"
 )
-
-// TODO: support command invocations in expressions
-
-// TODO: support following math functions
-// abs         acos        asin        atan
-// atan2       bool        ceil        cos
-// cosh        double      entier      exp
-// floor       fmod        hypot       int
-// isqrt       log         log10       max
-// min         pow         rand        round
-// sin         sinh        sqrt        srand
-// tan         tanh        wide
-// (where double, int, wide, entier are type conversions)
 
 // searchState indicates what the expression evaluator is expecting
 // to see next, typically either an argument or an operator. This is
@@ -115,15 +102,6 @@ func (n *exprNode) evaluate() (interface{}, *TclError) {
 	return "", nil
 }
 
-type functionNode struct {
-	exprNode
-	arguments vector.Vector // function arguments
-}
-
-func (f *functionNode) evaluate() {
-	// TODO: evaluate the arguments and invoke the function
-}
-
 type evaluator struct {
 	state     searchState
 	root      Evaluator     // root of the expression tree
@@ -145,41 +123,40 @@ func newEvaluator(interp *Interpreter) *evaluator {
 // dumpStacks prints the contents of the operator and argument stacks to the
 // console, useful for debugging the expression evaluator.
 func (e *evaluator) dumpStacks() {
-        fmt.Println("Argument stack...")
+	fmt.Println("Argument stack...")
 	if e.arguments.Len() == 0 {
 		fmt.Println("(empty)")
 	}
-        for ii := e.arguments.Len() - 1; ii >= 0; ii-- {
+	for ii := e.arguments.Len() - 1; ii >= 0; ii-- {
 		node, ok := e.arguments.At(ii).(ExprNode)
 		if !ok {
 			fmt.Printf("%d: not an ExprNode!", ii)
 		}
 		fmt.Printf("%d: %v (%T)\n", ii, node, node)
-        }
+	}
 
-        fmt.Println("\nOperator stack...")
+	fmt.Println("\nOperator stack...")
 	if e.operators.Len() == 0 {
 		fmt.Println("(empty)")
 	}
-        for ii := e.operators.Len() - 1; ii >= 0; ii-- {
+	for ii := e.operators.Len() - 1; ii >= 0; ii-- {
 		node, ok := e.operators.At(ii).(ExprNode)
 		if !ok {
 			fmt.Printf("%d: not an ExprNode!", ii)
 		}
 		fmt.Printf("%d: %v (%T)\n", ii, node, node)
-        }
+	}
 }
 
-// Reduce the operator stack by one. If the operator stack top is a left
-// parenthesis, no change is made.
+// Reduce the operator stack by one. If the element at the top of the operator
+// stack is a sentinel, no change is made.
 func (e *evaluator) reduce() *TclError {
-	// If there is a binary operator on top of the operator stack,
-	// there should be two trees on top of the argument stack, both
-	// representing expressions. Pop the operator and two trees off
-	// of the argument stack, combining them into a single tree
-	// node, which is then pushed back on the argument stack. Note
-	// that the trees on the argument stack represent the right and
-	// left arguments, respectively.
+	// If there is a binary operator on top of the operator stack, there
+	// should be two trees on top of the argument stack, both representing
+	// expressions. Pop the operator and two trees off of the argument
+	// stack, combining them into a single tree node, which is then pushed
+	// back on the argument stack. Note that the trees on the argument
+	// stack represent the right and left arguments, respectively.
 	top, ok := e.operators.Pop().(OperatorNode)
 	if !ok {
 		return NewTclError(EBADSTATE, "node on operator stack is not an operator!")
@@ -227,21 +204,15 @@ func (e *evaluator) handleEOF() *TclError {
 	// operator stack is empty, return the single tree as the
 	// result. If there are more trees and/or operators, reduce the
 	// stacks as far as possible.
-
 	count := 0
 	for e.operators.Len() > 0 {
 		top, ok := e.operators.Last().(OperatorNode)
 		if !ok {
 			return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
 		}
-		// TODO: handle these error cases
-		// if (top instanceof LeftParen) {
-		//     setError(Errors.UNMATCHED_LPAREN, top.getToken());
-		//     return;
-		// } else if (top instanceof LeftBracket) {
-		//     setError(Errors.UNMATCHED_LBRACKET, top.getToken());
-		//     return;
-		// } else
+		if top.getText() == "(" {
+			return NewTclError(EPAREN, "unmatched left parenthesis")
+		}
 		if top.isSentinel() {
 			return NewTclError(EBADEXPR, "sentinel operator encountered")
 		}
@@ -267,191 +238,56 @@ func (e *evaluator) handleEOF() *TclError {
 	return nil
 }
 
-// @Override
-// public void caseTLParenthese(TLParenthese node) {
-//     // Append state is definitely wrong, but argument and operator
-//     // states are perfectly exceptable.
-//     if (searchState == State.APPEND) {
-//         setError(Errors.DOT_REQUIRES_ID, node);
-//         return;
-//     }
-//     LeftParen lp = new LeftParen(node);
-//     // If the last token was an identifier, then this is a method call.
-//     if (previousToken instanceof TIdentifier) {
-//         // The argument stack is assumed to be empty.
-//         Node n = argumentStack.pop();
-//         MethodNode method = null;
-//         if (n instanceof IdentifierNode) {
-//             IdentifierNode inode = (IdentifierNode) n;
-//             method = new MethodNode(inode.getToken(), inode.getIdentifier());
-//         } else {
-//             JoinOperatorNode onode = (JoinOperatorNode) n;
-//             Node object = onode.getChild(0);
-//             String name = onode.getChild(1).getToken().getText();
-//             method = new MethodNode(onode.getToken(), object, name);
-//         }
-//         // Put it on the argument stack as a sentinel, to mark
-//         // the beginning of the method arguments.
-//         argumentStack.push(method);
-//         // Put it on the operator stack so when we find the
-//         // right parenthesis, we can determine that we were
-//         // making a method call.
-//         operatorStack.push(method);
-//         searchState = State.ARGUMENT;
-//         methodCount++;
-//     }
-//     // Else, it is the start of a type-cast or a subgroup.
-//     operatorStack.push(lp);
-// }
+// handleCloseParen reduces the operator stack until it find the
+// left parenthesis, signaling an error if this does not succeed.
+func (e *evaluator) handleCloseParen() *TclError {
+	if e.operators.Len() == 0 {
+		return NewTclError(EPAREN, "unmatched right parenthesis")
+	}
+	// If there is a left parenthesis on the operator stack, we can
+	// "cancel" the pair. If the operator stack contains some other
+	// operator on top, reduce the stacks. This also covers the case
+	// where the parentheses were used for grouping only.
+	top, ok := e.operators.Last().(OperatorNode)
+	for ok && !top.isSentinel() {
+		if err := e.reduce(); err != nil {
+			return err
+		}
+		if e.operators.Len() == 0 {
+			return NewTclError(EPAREN, "unmatched right parenthesis")
+		}
+		top, ok = e.operators.Last().(OperatorNode)
+	}
+	if top != nil && top.getText() == "(" {
+		// Remove the open parenthesis now that we're done reducing.
+		e.operators.Pop()
+	}
+	if e.operators.Len() == 0 {
+		// we're done
+		return nil
+	}
 
-// @Override
-// public void caseTRParenthese(TRParenthese node) {
-//     if (operatorStack.empty()) {
-//         setError(Errors.UNMATCHED_RPAREN, node);
-//         return;
-//     }
-//     // If there is a left parenthesis on the operator stack, we can
-//     // "cancel" the pair. If the operator stack contains some other
-//     // operator on top, reduce the stacks. This also covers the case
-//     // where the parentheses were used for grouping only.
-//     OperatorNode top = (OperatorNode) operatorStack.peek();
-//     while (!(top instanceof LeftParen)) {
-//         reduce();
-//         if (operatorStack.empty() || top.isSentinel()) {
-//             setError(Errors.UNMATCHED_RPAREN, node);
-//             return;
-//         }
-//         top = (OperatorNode) operatorStack.peek();
-//     }
-//     operatorStack.pop();
-
-//     // Now check for the method invocation case.
-//     if (!operatorStack.empty()
-//         && operatorStack.peek() instanceof MethodNode) {
-//         // It was a method invocation.
-//         MethodNode method = (MethodNode) operatorStack.pop();
-//         // Pop off the arguments and add them in reverse order.
-//         Node n = argumentStack.pop();
-//         Stack<Node> args = new Stack<Node>();
-//         while (n != method) {
-//             args.push(n);
-//             n = argumentStack.pop();
-//         }
-//         while (!args.empty()) {
-//             Node arg = args.pop();
-//             method.addChild(arg);
-//         }
-//         // Put the method invocation back on the argument stack
-//         // because it is treated as a value, not an operator.
-//         argumentStack.push(method);
-//         methodCount--;
-
-//     } else {
-//         // Maybe it is a type-cast operation; otherwise it was a
-//         // grouping operator and that has been taken care of.
-//         try {
-//             Node n = argumentStack.peek();
-//             if (n instanceof TypeNode) {
-//                 argumentStack.pop();
-//                 TypeNode tn = (TypeNode) n;
-//                 TypeCastOperatorNode tcon = new TypeCastOperatorNode(
-//                     tn.getToken(), tn.getTypeName());
-//                 handleOperator(tcon);
-//             } else if (n instanceof IdentifierNode) {
-//                 argumentStack.pop();
-//                 IdentifierNode in = (IdentifierNode) n;
-//                 TypeCastOperatorNode tcon = new TypeCastOperatorNode(
-//                     in.getToken(), in.getIdentifier());
-//                 handleOperator(tcon);
-//             } else if (n instanceof JoinOperatorNode) {
-//                 argumentStack.pop();
-//                 JoinOperatorNode jon = (JoinOperatorNode) n;
-//                 TypeCastOperatorNode tcon = new TypeCastOperatorNode(
-//                     jon.getToken(), jon.mergeChildren());
-//                 handleOperator(tcon);
-//             }
-//         } catch (EvaluationException ee) {
-//             setError(ee.getMessage(), top.getToken());
-//         } catch (EmptyStackException ese) {
-//             setError(Errors.MISSING_ARGS, top.getToken());
-//         }
-//     }
-// }
-
-// @Override
-// public void caseTLBracket(TLBracket node) {
-//     // Make sure there is something reasonable on the stack, since
-//     // a left bracket without a preceding type or identifier is
-//     // incorrect syntax.
-//     if (argumentStack.isEmpty()) {
-//         setError(Errors.UNEXPECTED_TOKEN, node);
-//     } else {
-//         Node n = argumentStack.peek();
-//         if (!(n instanceof JoinOperatorNode)
-//             && !(n instanceof IdentifierNode)
-//             && !(n instanceof TypeNode)) {
-//             setError(Errors.UNEXPECTED_TOKEN, node);
-//         }
-//     }
-//     // Push the left bracket on the operator stack. We can't tell yet
-//     // if this is going to be a typecast or an array access.
-//     Node lb = new LeftBracket(node);
-//     operatorStack.push(lb);
-//     // Put it on the argument stack as a sentinel for the array index,
-//     // if that is indeed what this turns out to be.
-//     argumentStack.push(lb);
-//     // We may have been looking for an argument or an operator,
-//     // and we can't be sure what we will find next.
-// }
-
-// @Override
-// public void caseTRBracket(TRBracket node) {
-//     // If there is a left bracket on the operator stack, we can
-//     // "cancel" the pair. If the operator stack contains some other
-//     // operator on top, reduce the stacks.
-//     if (operatorStack.empty()) {
-//         setError(Errors.UNMATCHED_RBRACKET, node);
-//         return;
-//     }
-//     OperatorNode top = (OperatorNode) operatorStack.peek();
-//     while (!(top instanceof LeftBracket)) {
-//         reduce();
-//         if (operatorStack.empty() || top.isSentinel()) {
-//             setError(Errors.UNMATCHED_RBRACKET, node);
-//             return;
-//         }
-//         top = (OperatorNode) operatorStack.peek();
-//     }
-//     operatorStack.pop();
-
-//     // Was there anything between the brackets?
-//     // (we know there will be a left bracket and something else on the
-//     // argument stack, given that we are here).
-//     Node index = argumentStack.pop();
-//     Node name = argumentStack.pop();
-//     if (index instanceof LeftBracket) {
-//         // It was probably part of a typecast, but we can't be sure.
-//         // In any case, make a TypeNode out of this and put it on
-//         // the argument stack.
-//         Token token = name.getToken();
-//         argumentStack.push(new TypeNode(token, token.getText() + "[]"));
-//     } else {
-//         // It was an array reference.
-//         // Make sure that only one array index was provided.
-//         if (name instanceof LeftBracket) {
-//             ArrayNode arrayref = new ArrayNode(name.getToken());
-//             // Retrieve the thing that was there before the left bracket
-//             // (an identifier or type).
-//             name = argumentStack.pop();
-//             arrayref.addChild(name);
-//             arrayref.addChild(index);
-//             // Put the array reference on the argument stack; it's a value.
-//             argumentStack.push(arrayref);
-//         } else {
-//             setError(Errors.ARRAY_MULTI_INDEX, name.getToken());
-//         }
-//     }
-// }
+	// Now check for the function invocation case.
+	if fun, ok := e.operators.Last().(FunctionNode); ok {
+		// Take the function off of the operator stack, and then
+		// remove nodes from the arguments stack until we see the
+		// function node.
+		e.operators.Pop()
+		_, ok := e.arguments.Last().(FunctionNode)
+		for !ok {
+			arg := e.arguments.Pop()
+			// Shove each new argument in the front of the list.
+			fun.PushArgument(arg)
+			_, ok = e.arguments.Last().(FunctionNode)
+		}
+		e.arguments.Pop()
+		// Put the function invocation back on the argument stack
+		// because it is treated as a value, not an operator.
+		e.arguments.Push(fun)
+		e.funcCount--
+	}
+	return nil
+}
 
 // handleComma attempts to reduce the operator stack with the assumption
 // that the comma is being used to separate arguments to a function
@@ -482,8 +318,6 @@ func (e *evaluator) handleComma() *TclError {
 	return nil
 }
 
-// TODO: see the other relevant case methods in TreeBuilder.java
-
 // EvaluateExpression parses the input string as a Tcl expression,
 // evaluating it and returning the result. Supported expressions include
 // variable references, nested commands (inside square brackets), string
@@ -492,38 +326,33 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 	c := lexExpr("EvaluateExpression", expr)
 	e := newEvaluator(interp)
 
-	// TODO: get the evaluator working with operator precedence (e.g. * before +)
-	// TODO: get the evaluator working for grouped expressions (e.g. (1 + 2) * 3)
-	// TODO: get the evaluator working for nested commands
-	// TODO: get the evaluator working for function invocation
-
 	// pull tokens from lexer, building expression tree
-	for token := range c {
-		if token.typ == tokenError {
-			return "", NewTclError(ELEXER, token.val)
+	for tok := range c {
+		if tok.typ == tokenError {
+			return "", NewTclError(ELEXER, tok.val)
 
-		} else if token.typ == tokenEOF {
+		} else if tok.typ == tokenEOF {
 			err := e.handleEOF()
 			if err != nil {
 				return "", err
 			}
 			break
 
-		} else if token.typ == tokenVariable || token.typ == tokenCommand ||
-			token.typ == tokenInteger || token.typ == tokenFloat ||
-			token.typ == tokenString || token.typ == tokenBrace ||
-			token.typ == tokenQuote {
-			node := newExprNode(e, token)
+		} else if tok.typ == tokenVariable || tok.typ == tokenCommand ||
+			tok.typ == tokenInteger || tok.typ == tokenFloat ||
+			tok.typ == tokenString || tok.typ == tokenBrace ||
+			tok.typ == tokenQuote {
+			node := newExprNode(e, tok)
 			e.arguments.Push(node)
 			e.state = searchOperator
 
-		} else if token.typ == tokenOperator {
+		} else if tok.typ == tokenOperator {
 			// based on search state, it's either a unary or binary operator
 			var node *operatorNode
 			if e.state == searchOperator {
-				node = newOperatorNode(e, token, 2)
+				node = newOperatorNode(e, tok, 2)
 			} else if e.state == searchArgument {
-				node = newOperatorNode(e, token, 1)
+				node = newOperatorNode(e, tok, 1)
 			}
 
 			// If the operator stack is empty, push the new operator.
@@ -547,13 +376,12 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 			e.operators.Push(node)
 			e.state = searchArgument
 
-		} else if token.typ == tokenFunction {
-			// TODO: expecting arguments until right parenthesis encountered
+		} else if tok.typ == tokenFunction {
+			// expecting arguments until right parenthesis encountered
 			e.funcCount++
-			// TODO: should be constructing functionNode here
-			node := newExprNode(e, token)
+			node := newFunctionNode(e, tok)
 			// Put it on the argument stack as a sentinel, to mark
-			// the beginning of the method arguments.
+			// the beginning of the function arguments.
 			e.arguments.Push(node)
 			// Put it on the operator stack so when we find the
 			// right parenthesis, we can determine that we were
@@ -561,10 +389,19 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 			e.operators.Push(node)
 			e.state = searchArgument
 
-		} else if token.typ == tokenParen {
-			// TODO: grouping operator, call caseTLParenthese
+		} else if tok.typ == tokenParen {
+			if tok.val == "(" {
+				leftParen := newOperatorNode(e, tok, 1)
+				e.operators.Push(leftParen)
+			} else {
+				// If not open paren, then it is close paren.
+				err := e.handleCloseParen()
+				if err != nil {
+					return "", err
+				}
+			}
 
-		} else if token.typ == tokenComma {
+		} else if tok.typ == tokenComma {
 			e.handleComma()
 		}
 	}

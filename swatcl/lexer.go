@@ -544,7 +544,8 @@ func lexOperator(l *lexer) stateFn {
 }
 
 // lexFunction expects the next position to be the start of a function
-// invocation, and advances to the opening parenthesis.
+// invocation, and advances to the opening parenthesis. Both a function
+// and open parenthesis token will be emitted to the channel.
 func lexFunction(l *lexer) stateFn {
 	r := l.next()
 	// scan forward as long as we see an alphanumeric string
@@ -555,6 +556,9 @@ func lexFunction(l *lexer) stateFn {
 	if r != '(' {
 		return l.errorf("apparent function call missing (: %q", l.input[l.start:l.pos])
 	}
+	l.backup()
 	l.emit(tokenFunction)
+	l.next()
+	l.emit(tokenParen)
 	return l.state
 }

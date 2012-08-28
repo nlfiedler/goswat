@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Nathan Fiedler. All rights reserved.
+// Copyright 2011-2012 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -137,5 +137,16 @@ func TestPerformRemainder(t *testing.T) {
 	values["\"abc\" % 1"] = "error"
 	values["1 % \"abc\""] = "error"
 	values["\"abc\" % \"123\""] = "error"
+	evaluateAndCompare(i, values, t)
+}
+
+func TestOperatorPrecedence(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 + 2 * 3"] = "7"
+	values["3 * 1 + 2"] = "5"
+	values["(1 + 2) * 3"] = "9"
+	values["3 * (1 + 2)"] = "9"
+	values["((1 + 1) - 2) * 3"] = "0"
 	evaluateAndCompare(i, values, t)
 }

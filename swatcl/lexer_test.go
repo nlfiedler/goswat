@@ -335,12 +335,15 @@ func TestLexerOperators(t *testing.T) {
 func TestLexerFunctions(t *testing.T) {
 	input := "a12() abs(123) max(1, 2) foo"
 	expected := make([]expectedLexerResult, 0)
-	expected = append(expected, expectedLexerResult{tokenFunction, "a12("})
+	expected = append(expected, expectedLexerResult{tokenFunction, "a12"})
+	expected = append(expected, expectedLexerResult{tokenParen, "("})
 	expected = append(expected, expectedLexerResult{tokenParen, ")"})
-	expected = append(expected, expectedLexerResult{tokenFunction, "abs("})
+	expected = append(expected, expectedLexerResult{tokenFunction, "abs"})
+	expected = append(expected, expectedLexerResult{tokenParen, "("})
 	expected = append(expected, expectedLexerResult{tokenInteger, "123"})
 	expected = append(expected, expectedLexerResult{tokenParen, ")"})
-	expected = append(expected, expectedLexerResult{tokenFunction, "max("})
+	expected = append(expected, expectedLexerResult{tokenFunction, "max"})
+	expected = append(expected, expectedLexerResult{tokenParen, "("})
 	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
 	expected = append(expected, expectedLexerResult{tokenComma, ","})
 	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
