@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Nathan Fiedler. All rights reserved.
+// Copyright 2011-2012 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -7,6 +7,7 @@
 package swatcl
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -18,8 +19,8 @@ func TestExprNewEvaluator(t *testing.T) {
 	}
 }
 
-// evaluateAndCompare invokes EvaluateExpession on each of the map
-// keys and compares the result to the corresponding map value.
+// evaluateAndCompare invokes EvaluateExpession on each of the map keys and
+// compares the result to the corresponding map value.
 func evaluateAndCompare(interp *Interpreter, values map[string]string, t *testing.T) {
 	for k, v := range values {
 		r, e := EvaluateExpression(interp, k)
@@ -29,6 +30,19 @@ func evaluateAndCompare(interp *Interpreter, values map[string]string, t *testin
 			}
 		} else if r != v {
 			t.Errorf("evaluation of '%s' resulted in '%s'", k, r)
+		}
+	}
+}
+
+// evaluateForError invokes EvaluateExpession on each of the map keys and
+// compares the (expected) error result to the corresponding map value.
+func evaluateForError(interp *Interpreter, values map[string]string, t *testing.T) {
+	for k, v := range values {
+		_, e := EvaluateExpression(interp, k)
+		if e == nil {
+			t.Errorf("evaluation of '%s' should have faild with '%s'", k, v)
+		} else if !strings.Contains(e.String(), v) {
+			t.Errorf("evaluation of '%s' yielded wrong error: '%s'", k, e)
 		}
 	}
 }
@@ -77,12 +91,4 @@ func TestMissingParen(t *testing.T) {
 	if e == nil {
 		t.Error("expected missing open paren to fail")
 	}
-}
-
-func TestFunctions(t *testing.T) {
-	i := NewInterpreter()
-	values := make(map[string]string)
-	values["abs(1)"] = "1"
-	values["abs(-1)"] = "1"
-	evaluateAndCompare(i, values, t)
 }

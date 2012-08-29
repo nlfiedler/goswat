@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Nathan Fiedler. All rights reserved.
+// Copyright 2011-2012 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -9,18 +9,6 @@ package swatcl
 import (
 	"testing"
 )
-
-func assertNoError(t *testing.T, err *TclError) {
-	if err != nil {
-		t.Errorf("error in addition: %s", err)
-	}
-}
-
-func assertError(t *testing.T, err *TclError) {
-	if err == nil {
-		t.Error("expected an error")
-	}
-}
 
 // evalStrAndCompare invokes evalString on each of the map keys and
 // compares the result to the corresponding map value.

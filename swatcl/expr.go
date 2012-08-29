@@ -266,7 +266,7 @@ func (e *evaluator) handleCloseParen() *TclError {
 		// we're done
 		return nil
 	}
-
+	// e.dumpStacks()
 	// Now check for the function invocation case.
 	if fun, ok := e.operators.Last().(FunctionNode); ok {
 		// Take the function off of the operator stack, and then
@@ -403,6 +403,7 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 
 		} else if tok.typ == tokenComma {
 			e.handleComma()
+			e.state = searchArgument
 		}
 	}
 
