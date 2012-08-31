@@ -39,15 +39,10 @@ const (
 	searchOperator // expecting an operator
 )
 
-// Evaluator knows how to evaluate a Tcl expression.
-type Evaluator interface {
-	evaluate() (interface{}, *TclError)
-}
-
 // ExprNode represents a node in the expression tree that can be evaluated
 // to a final value.
 type ExprNode interface {
-	Evaluator
+	evaluate() (interface{}, returnCode, *TclError)
 	getText() string
 }
 
@@ -56,11 +51,11 @@ type ExprNode interface {
 type exprNode struct {
 	token tokenType
 	text  string
-	eval  *evaluator
+	eval  Evaluator
 }
 
 // newExprNode creates a new expression node based on the token and text.
-func newExprNode(eval *evaluator, token token) *exprNode {
+func newExprNode(eval Evaluator, token token) *exprNode {
 	return &exprNode{token.typ, token.contents(), eval}
 }
 
@@ -69,25 +64,22 @@ func (n *exprNode) getText() string {
 	return n.text
 }
 
+// String returns a string representation of the node.
 func (n *exprNode) String() string {
 	return n.text
 }
 
 // evaluate evaluates the expression node appropriately based on its type.
-func (n *exprNode) evaluate() (interface{}, *TclError) {
+func (n *exprNode) evaluate() (interface{}, returnCode, *TclError) {
 	switch n.token {
 	case tokenVariable:
-		str, err := n.eval.interp.GetVariable(n.text)
+		str, err := n.eval.GetVariable(n.text)
 		if err != nil {
-			return "", err
+			return "", returnError, err
 		}
-		val, err := coerceNumber(str)
-		if err != nil {
-			return "", err
-		}
-		return val, nil
+		return coerceNumber(str)
 	case tokenCommand:
-		return "[cmd]", nil // TODO: implement command invocation
+		return n.eval.Interpret(n.text)
 	case tokenInteger:
 		return atoi(n.text)
 	case tokenFloat:
@@ -97,22 +89,36 @@ func (n *exprNode) evaluate() (interface{}, *TclError) {
 		return evalString(n.text)
 	case tokenBrace:
 		// return the string as-is
-		return n.text, nil
+		return n.text, returnOk, nil
 	}
-	return "", nil
+	return "", returnOk, nil
 }
 
+// Evaluator knows how to evaluate a Tcl expression.
+type Evaluator interface {
+	// Evaluate parses the expression, evaluates it, and returns the
+	// result.
+	Evaluate(expr string) (string, returnCode, *TclError)
+	// Interpret passes the expression to the associated interpreter and
+	// returns the result.
+	Interpret(expr string) (string, returnCode, *TclError)
+	// GetVariable retrieves a variable from the interpreter.
+	GetVariable(name string) (string, *TclError)
+}
+
+// evaluator is an implementation of the Evaluator interface.
 type evaluator struct {
-	state     searchState
-	root      Evaluator     // root of the expression tree
-	interp    *Interpreter  // contains program state
+	state     searchState   // looking for argument or operator?
+	root      ExprNode      // root of the expression tree
+	interp    Interpreter   // contains program state
 	arguments vector.Vector // argument stack
 	operators vector.Vector // operator stack
-	funcCount int
-	//prevToken tokenType
+	funcCount int           // depth of function call nesting
 }
 
-func newEvaluator(interp *Interpreter) *evaluator {
+// newEvaluator constructs an instance of Evaluator and associates it with
+// the given interpreter, which allows for executing nested commands.
+func newEvaluator(interp Interpreter) Evaluator {
 	e := &evaluator{
 		state:  searchArgument,
 		interp: interp,
@@ -225,9 +231,9 @@ func (e *evaluator) handleEOF() *TclError {
 		}
 	}
 	if e.arguments.Len() > 0 {
-		topArg, ok := e.arguments.Pop().(Evaluator)
+		topArg, ok := e.arguments.Pop().(ExprNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "node on argument stack is not an Evaluator!")
+			return NewTclError(EBADSTATE, "node on argument stack is not an ExprNode!")
 		}
 		if e.arguments.Len() == 0 && e.operators.Len() == 0 {
 			e.root = topArg
@@ -318,23 +324,53 @@ func (e *evaluator) handleComma() *TclError {
 	return nil
 }
 
-// EvaluateExpression parses the input string as a Tcl expression,
-// evaluating it and returning the result. Supported expressions include
-// variable references, nested commands (inside square brackets), string
-// and numeric literals, and math and type coercion functions.
-func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
-	c := lexExpr("EvaluateExpression", expr)
-	e := newEvaluator(interp)
+// forcePrecedence will reduce the operator stack if the new node has higher
+// precedence than the operators currently on the stack.
+func (e *evaluator) forcePrecedence(node OperatorNode) *TclError {
+	// If the operator stack is empty, push the new operator.
+	// If it has an operator on top, compare the precedence
+	// of the two and push the new one if it has lower precedence
+	// (or equal precedence: this will force left associativity).
+	// Otherwise reduce the two stacks.
+	if e.operators.Len() > 0 {
+		top, ok := e.operators.Last().(OperatorNode)
+		if !ok {
+			return NewTclError(EBADSTATE,
+				"node on operator stack is not an operatorNode!")
+		}
+		if !top.isSentinel() && node.getPrecedence() >= top.getPrecedence() {
+			err := e.reduce()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
-	// pull tokens from lexer, building expression tree
+// Evaluate parses the input string as a Tcl expression, evaluating it and
+// returning the result. Supported expressions include variable references,
+// nested commands (inside square brackets), string and numeric literals, and
+// math and type coercion functions.
+func (e *evaluator) Evaluate(expr string) (string, returnCode, *TclError) {
+	// reset the evaluator so it is ready for a new expression
+	e.state = searchArgument
+	e.arguments = nil
+	e.operators = nil
+	e.funcCount = 0
+	e.root = nil
+	// lex the input expression into tokens
+	c := lexExpr("Evaluate", expr)
+
+	// pull tokens from lexer, building the expression tree
 	for tok := range c {
 		if tok.typ == tokenError {
-			return "", NewTclError(ELEXER, tok.val)
+			return "", returnError, NewTclError(ELEXER, tok.val)
 
 		} else if tok.typ == tokenEOF {
 			err := e.handleEOF()
 			if err != nil {
-				return "", err
+				return "", returnError, err
 			}
 			break
 
@@ -354,25 +390,7 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 			} else if e.state == searchArgument {
 				node = newOperatorNode(e, tok, 1)
 			}
-
-			// If the operator stack is empty, push the new operator.
-			// If it has an operator on top, compare the precedence
-			// of the two and push the new one if it has lower precedence
-			// (or equal precedence: this will force left associativity).
-			// Otherwise reduce the two stacks.
-			if e.operators.Len() > 0 {
-				top, ok := e.operators.Last().(OperatorNode)
-				if !ok {
-					return "", NewTclError(EBADSTATE,
-						"node on operator stack is not an operatorNode!")
-				}
-				if !top.isSentinel() && node.getPrecedence() >= top.getPrecedence() {
-					err := e.reduce()
-					if err != nil {
-						return "", err
-					}
-				}
-			}
+			e.forcePrecedence(node)
 			e.operators.Push(node)
 			e.state = searchArgument
 
@@ -397,7 +415,7 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 				// If not open paren, then it is close paren.
 				err := e.handleCloseParen()
 				if err != nil {
-					return "", err
+					return "", returnError, err
 				}
 			}
 
@@ -410,9 +428,21 @@ func EvaluateExpression(interp *Interpreter, expr string) (string, *TclError) {
 	if e.root == nil {
 		panic("expression parsing failed!")
 	}
-	result, err := e.root.evaluate()
+	result, code, err := e.root.evaluate()
 	if err != nil {
-		return "", err
+		return "", returnError, err
 	}
-	return fmt.Sprint(result), nil
+	return fmt.Sprint(result), code, nil
+}
+
+// Interpret passes the expression to the Tcl interpreter associated with
+// this evaluator and returns the result.
+func (e *evaluator) Interpret(expr string) (string, returnCode, *TclError) {
+	return e.interp.Evaluate(expr)
+}
+
+// GetVariable retrieves the value for the named variable from the
+// interpreter.
+func (e *evaluator) GetVariable(name string) (string, *TclError) {
+	return e.interp.GetVariable(name)
 }

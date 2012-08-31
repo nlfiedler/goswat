@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Nathan Fiedler. All rights reserved.
+// Copyright 2011-2012 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -7,93 +7,93 @@
 package swatcl
 
 import (
+	"bytes"
 	"fmt"
 )
 
+// commandExpr implements the Tcl 'expr' command.
+func commandExpr(i Interpreter, argv []string, data []string) (string, returnCode, *TclError) {
+	buf := new(bytes.Buffer)
+	for ii := 1; ii < len(argv); ii++ {
+		buf.WriteString(argv[ii])
+		buf.WriteRune(' ')
+	}
+	input := buf.String()
+	eval := newEvaluator(i)
+	return eval.Evaluate(input)
+}
+
 // commandIf implements the Tcl 'if/then/elseif/else' command.
-func commandIf(i *Interpreter, argv []string, data []string) (string, *TclError) {
+func commandIf(i Interpreter, argv []string, data []string) (string, returnCode, *TclError) {
 	// if expr1 ?then? body1 elseif expr2 ?then? body2 elseif ... ?else? ?bodyN?
 	if len(argv) != 3 && len(argv) != 5 {
-		return "", i.arityError(argv[0])
+		return "", returnError, arityError(argv[0])
 	}
 	// TODO: allow optional 'then' keyword
-	err := i.Evaluate(argv[1])
+	eval := newEvaluator(i)
+	result, code, err := eval.Evaluate(argv[1])
 	if err != nil {
-		return "", err
+		return "", code, err
 	}
 	// TODO: support additional elseif/then clauses
-	b, err := evalBoolean(i.result)
+	b, err := evalBoolean(result)
 	if err != nil {
-		return "", err
+		return "", returnError, err
 	}
 	if b {
-		err = i.Evaluate(argv[2])
+		result, code, err = i.Evaluate(argv[2])
 	} else if len(argv) == 5 {
 		if argv[3] != "else" {
-			return "", NewTclError(ECOMMAND, "missing 'else' keyword prior to last body")
+			return "", returnError, NewTclError(ECOMMAND, "missing 'else' keyword prior to last body")
 		}
 		// TODO: need to check that second last argument is 'else'
-		err = i.Evaluate(argv[4])
+		result, code, err = i.Evaluate(argv[4])
 	}
 	if err != nil {
-		return "", err
+		return "", returnError, err
 	}
-	return i.result, nil
+	return result, code, nil
 }
 
 // commandPuts implements the Tcl 'puts' command (print a string to the console).
-func commandPuts(i *Interpreter, argv []string, data []string) (string, *TclError) {
-	if len(argv) != 2 {
-		return "", i.arityError(argv[0])
+func commandPuts(i Interpreter, argv []string, data []string) (string, returnCode, *TclError) {
+	if len(argv) < 2 {
+		return "", returnError, arityError(argv[0])
 	}
-	fmt.Printf("%s\n", argv[1])
-	return argv[1], nil
+	format := "%s\n"
+	argi := 1
+	if argv[1] == "-nonewline" {
+		format = "%s"
+		argi = 2
+	}
+	fmt.Fprintf(i, format, argv[argi])
+	return argv[argi], returnOk, nil
 }
 
 // commandSet implements the Tcl 'set' command (set a variable value).
-func commandSet(i *Interpreter, argv []string, data []string) (string, *TclError) {
+func commandSet(i Interpreter, argv []string, data []string) (string, returnCode, *TclError) {
 	if len(argv) < 2 {
-		return "", i.arityError(argv[0])
+		return "", returnError, arityError(argv[0])
 	}
 	if len(argv) == 3 {
 		err := i.SetVariable(argv[1], argv[2])
 		if err != nil {
-			return "", err
+			return "", returnError, err
 		}
-		return argv[2], nil
+		return argv[2], returnOk, nil
 	} else {
 		val, err := i.GetVariable(argv[1])
 		if err != nil {
-			return "", err
+			return "", returnError, err
 		}
-		return val, nil
+		return val, returnOk, nil
 	}
-	panic("unreachable code reached")
+	panic("unreachable code")
 }
 
 //
 // TODO: translate to idiomatic Go code
 //
-
-// int picolCommandMath(struct picolInterp *i, int argc, char **argv, void *pd) {
-//     char buf[64]; int a, b, c;
-//     if (argc != 3) return picolArityErr(i,argv[0]);
-//     a = atoi(argv[1]); b = atoi(argv[2]);
-//     if (argv[0][0] == '+') c = a+b;
-//     else if (argv[0][0] == '-') c = a-b;
-//     else if (argv[0][0] == '*') c = a*b;
-//     else if (argv[0][0] == '/') c = a/b;
-//     else if (argv[0][0] == '>' && argv[0][1] == '\0') c = a > b;
-//     else if (argv[0][0] == '>' && argv[0][1] == '=') c = a >= b;
-//     else if (argv[0][0] == '<' && argv[0][1] == '\0') c = a < b;
-//     else if (argv[0][0] == '<' && argv[0][1] == '=') c = a <= b;
-//     else if (argv[0][0] == '=' && argv[0][1] == '=') c = a == b;
-//     else if (argv[0][0] == '!' && argv[0][1] == '=') c = a != b;
-//     else c = 0; /* I hate warnings */
-//     snprintf(buf,64,"%d",c);
-//     picolSetResult(i,buf);
-//     return PICOL_OK;
-// }
 
 // int picolCommandWhile(struct picolInterp *i, int argc, char **argv, void *pd) {
 //     if (argc != 3) return picolArityErr(i,argv[0]);
@@ -116,20 +116,6 @@ func commandSet(i *Interpreter, argv []string, data []string) (string, *TclError
 //     if (strcmp(argv[0],"break") == 0) return PICOL_BREAK;
 //     else if (strcmp(argv[0],"continue") == 0) return PICOL_CONTINUE;
 //     return PICOL_OK;
-// }
-
-// void picolDropCallFrame(struct picolInterp *i) {
-//     struct picolCallFrame *cf = i->callframe;
-//     struct picolVar *v = cf->vars, *t;
-//     while(v) {
-//         t = v->next;
-//         free(v->name);
-//         free(v->val);
-//         free(v);
-//         v = t;
-//     }
-//     i->callframe = cf->parent;
-//     free(cf);
 // }
 
 // int picolCommandCallProc(struct picolInterp *i, int argc, char **argv, void *pd) {

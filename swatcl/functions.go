@@ -31,7 +31,7 @@ type functionNode struct {
 
 // newFunctionNode constructs a new function node. Any arguments may be added
 // to the node as they are encountered by the interpreter.
-func newFunctionNode(eval *evaluator, token token) FunctionNode {
+func newFunctionNode(eval Evaluator, token token) FunctionNode {
 	text := token.contents()
 	return &functionNode{exprNode{token.typ, text, eval}, nil}
 }
@@ -65,13 +65,13 @@ func populateFunctionTable() {
 
 // evaluate will evalute the function arguments and then invoke the function
 // using those arguments, returning the result.
-func (f *functionNode) evaluate() (interface{}, *TclError) {
+func (f *functionNode) evaluate() (interface{}, returnCode, *TclError) {
 	if len(functionTable) == 0 {
 		populateFunctionTable()
 	}
 	fn := functionTable[f.text]
 	if fn == nil {
-		return nil, NewTclError(ENOFUNC, "unsupported function "+f.text)
+		return nil, returnError, NewTclError(ENOFUNC, "unsupported function "+f.text)
 	}
 	// evaluate the arguments and invoke the function
 	args := make([]interface{}, 0, len(f.arguments))
@@ -79,15 +79,19 @@ func (f *functionNode) evaluate() (interface{}, *TclError) {
 		en, ok := a.(ExprNode)
 		if !ok {
 			msg := fmt.Sprintf("function argument wrong type: '%v' (%T)", a, a)
-			return nil, NewTclError(EILLARG, msg)
+			return nil, returnError, NewTclError(EILLARG, msg)
 		}
-		val, err := en.evaluate()
+		val, code, err := en.evaluate()
 		if err != nil {
-			return nil, err
+			return nil, code, err
 		}
 		args = append(args, val)
 	}
-	return fn(args)
+	result, err := fn(args)
+	if err != nil {
+		return result, returnError, err
+	}
+	return result, returnOk, err
 }
 
 // getText returns the name of the function.

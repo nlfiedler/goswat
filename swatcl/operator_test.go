@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestExprUnaryPlus(t *testing.T) {
+func TestOperatorUnaryPlus(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["+1"] = "1"
@@ -22,7 +22,7 @@ func TestExprUnaryPlus(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestExprBinaryPlus(t *testing.T) {
+func TestOperatorBinaryPlus(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["1 + 1"] = "2"
@@ -44,7 +44,7 @@ func TestExprBinaryPlus(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestExprUnaryMinus(t *testing.T) {
+func TestOperatorUnaryMinus(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["-1"] = "-1"
@@ -56,7 +56,7 @@ func TestExprUnaryMinus(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestExprBinaryMinus(t *testing.T) {
+func TestOperatorBinaryMinus(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["1 - 1"] = "0"
@@ -76,7 +76,7 @@ func TestExprBinaryMinus(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestExprBinaryMultiply(t *testing.T) {
+func TestOperatorMultiply(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["1 * 1"] = "1"
@@ -97,7 +97,7 @@ func TestExprBinaryMultiply(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestExprBinaryDivide(t *testing.T) {
+func TestOperatorDivide(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["1 / 1"] = "1"
@@ -118,7 +118,7 @@ func TestExprBinaryDivide(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestPerformRemainder(t *testing.T) {
+func TestOperatorRemainder(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
 	values["1 % 1"] = "0"
@@ -148,5 +148,15 @@ func TestOperatorPrecedence(t *testing.T) {
 	values["(1 + 2) * 3"] = "9"
 	values["3 * (1 + 2)"] = "9"
 	values["((1 + 1) - 2) * 3"] = "0"
+	evaluateAndCompare(i, values, t)
+}
+
+func TestOperatorStringEquality(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["{a} eq {a}"] = "1"
+	values["{a} eq {b}"] = "0"
+	values["{a} ne {b}"] = "1"
+	values["{a} ne {a}"] = "0"
 	evaluateAndCompare(i, values, t)
 }

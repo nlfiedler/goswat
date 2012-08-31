@@ -11,19 +11,12 @@ import (
 	"testing"
 )
 
-func TestExprNewEvaluator(t *testing.T) {
-	i := NewInterpreter()
-	e := newEvaluator(i)
-	if e.state != searchArgument {
-		t.Error("new evaluator in incorrect state")
-	}
-}
-
 // evaluateAndCompare invokes EvaluateExpession on each of the map keys and
 // compares the result to the corresponding map value.
-func evaluateAndCompare(interp *Interpreter, values map[string]string, t *testing.T) {
+func evaluateAndCompare(interp Interpreter, values map[string]string, t *testing.T) {
+	eval := newEvaluator(interp)
 	for k, v := range values {
-		r, e := EvaluateExpression(interp, k)
+		r, _, e := eval.Evaluate(k)
 		if e != nil {
 			if v != "error" {
 				t.Errorf("evaluation of '%s' failed: %s", k, e)
@@ -36,9 +29,10 @@ func evaluateAndCompare(interp *Interpreter, values map[string]string, t *testin
 
 // evaluateForError invokes EvaluateExpession on each of the map keys and
 // compares the (expected) error result to the corresponding map value.
-func evaluateForError(interp *Interpreter, values map[string]string, t *testing.T) {
+func evaluateForError(interp Interpreter, values map[string]string, t *testing.T) {
+	eval := newEvaluator(interp)
 	for k, v := range values {
-		_, e := EvaluateExpression(interp, k)
+		_, _, e := eval.Evaluate(k)
 		if e == nil {
 			t.Errorf("evaluation of '%s' should have faild with '%s'", k, v)
 		} else if !strings.Contains(e.String(), v) {
@@ -81,14 +75,40 @@ func TestExprString(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
-func TestMissingParen(t *testing.T) {
+func TestExprMissingParen(t *testing.T) {
 	i := NewInterpreter()
-	_, e := EvaluateExpression(i, "(1 + 2")
-	if e == nil {
+	eval := newEvaluator(i)
+	_, _, err := eval.Evaluate("(1 + 2")
+	if err == nil {
 		t.Error("expected missing close paren to fail")
 	}
-	_, e = EvaluateExpression(i, "1 + 2)")
-	if e == nil {
+	_, _, err = eval.Evaluate("1 + 2)")
+	if err == nil {
 		t.Error("expected missing open paren to fail")
+	}
+}
+
+func TestExprNestedCmd(t *testing.T) {
+	i := NewInterpreter()
+	eval := newEvaluator(i)
+	result, _, err := eval.Evaluate("[expr 8.2 + 6]")
+	if err != nil {
+		t.Errorf("evaluating nested [expr] failed: %s", err)
+	}
+	if result != "14.2" {
+		t.Errorf("nested [expr] returned wrong result: '%s'", result)
+	}
+}
+
+func TestExprVariable(t *testing.T) {
+	i := NewInterpreter()
+	i.SetVariable("foo", "8.2")
+	eval := newEvaluator(i)
+	result, _, err := eval.Evaluate("[expr $foo + 6]")
+	if err != nil {
+		t.Errorf("evaluating nested [expr] failed: %s", err)
+	}
+	if result != "14.2" {
+		t.Errorf("nested [expr] returned wrong result: '%s'", result)
 	}
 }

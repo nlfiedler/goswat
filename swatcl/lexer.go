@@ -552,13 +552,20 @@ func lexFunction(l *lexer) stateFn {
 	for (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
 		r = l.next()
 	}
-	// next character must be an open parenthesis
-	if r != '(' {
-		return l.errorf("apparent function call missing (: %q", l.input[l.start:l.pos])
-	}
 	l.backup()
-	l.emit(tokenFunction)
-	l.next()
-	l.emit(tokenParen)
+	// if next character is an open parenthesis, it's a function call
+	if r == '(' {
+		l.emit(tokenFunction)
+		l.next()
+		l.emit(tokenParen)
+	} else {
+		// check for special case operators: eq, ne, in, ni
+		s := l.input[l.start:l.pos]
+		if s == "eq" || s == "ne" || s == "in" || s == "ni" {
+			l.emit(tokenOperator)
+		} else {
+			return l.errorf("apparent function call missing (: %q", s)
+		}
+	}
 	return l.state
 }

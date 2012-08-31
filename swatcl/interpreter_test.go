@@ -1,5 +1,5 @@
 //
-// Copyright 2011 Nathan Fiedler. All rights reserved.
+// Copyright 2011-2012 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -10,72 +10,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// interpResult is the expected state of the interpreter.
-type interpResult struct {
-	level    int
-	frames   []callFrame
-	commands map[string]swatclCmd
-	result   string
-}
-
-// validateInterpreter checks that the interpreter is in exactly the
-// state specified by the result, failing if that is not the case.
-func validateInterpreter(interp *Interpreter, result interpResult, t *testing.T) {
-	if interp.level != result.level {
-		t.Errorf("level did not match (expected %d, actual %d)", result.level, interp.level)
-	}
-	if interp.result != result.result {
-		t.Errorf("result did not match (expected %s, actual %s)", result.result, interp.result)
-	}
-	if result.frames != nil {
-		if len(interp.frames) != len(result.frames) {
-			t.Errorf("frame count did not match (expected %d, actual %d)",
-				len(result.frames), len(interp.frames))
-		}
-		// TODO: add more frame checks
-	}
-	if result.commands != nil {
-		if len(interp.commands) != len(result.commands) {
-			t.Errorf("command count did not match (expected %d, actual %d)",
-				len(result.commands), len(interp.commands))
-		}
-		// TODO: add more command checks
-	}
-}
-
-//
-// NewInterpreter
-//
-
-func TestNewInterpreter(t *testing.T) {
-	interp := NewInterpreter()
-	result := interpResult{0, nil, nil, ""}
-	validateInterpreter(interp, result, t)
-}
-
-//
-// addFrame
-//
-
-func TestInterpAddFrame(t *testing.T) {
-	interp := NewInterpreter()
-	result := interpResult{0, make([]callFrame, 1), nil, ""}
-	validateInterpreter(interp, result, t)
-}
-
-//
-// popFrame
-//
-
-func TestInterpPopFrame(t *testing.T) {
-	interp := NewInterpreter()
-	result := interpResult{0, make([]callFrame, 1), nil, ""}
-	validateInterpreter(interp, result, t)
-	interp.popFrame()
-	result = interpResult{0, make([]callFrame, 0), nil, ""}
-	validateInterpreter(interp, result, t)
-}
 
 //
 // RegisterCommand
@@ -189,10 +123,10 @@ func TestInterpSetGetFrames(t *testing.T) {
 var testCmdCalled bool
 var testCmdArgs string
 
-func testCmd(context *Interpreter, argv []string, data []string) (string, *TclError) {
+func testCmd(context Interpreter, argv []string, data []string) (string, returnCode, *TclError) {
 	testCmdCalled = true
 	testCmdArgs = strings.Join(argv[1:], ",")
-	return "cmd", nil
+	return "cmd", returnOk, nil
 }
 
 func TestInterpInvokeCommand(t *testing.T) {
@@ -206,7 +140,7 @@ func TestInterpInvokeCommand(t *testing.T) {
 	args = append(args, "a")
 	args = append(args, "b")
 	args = append(args, "c")
-	err = interp.InvokeCommand(args)
+	result, _, err := interp.InvokeCommand(args)
 	if err != nil {
 		t.Error("failed to invoke command foo")
 	}
@@ -216,7 +150,7 @@ func TestInterpInvokeCommand(t *testing.T) {
 	if testCmdArgs != "a,b,c" {
 		t.Error("testCmd did not receive expected arguments")
 	}
-	if interp.result != "cmd" {
+	if result != "cmd" {
 		t.Error("testCmd failed to affect result of interpreter")
 	}
 }
@@ -227,11 +161,11 @@ func TestInterpInvokeCommand(t *testing.T) {
 
 func TestInterpEvaluateCommand(t *testing.T) {
 	interp := NewInterpreter()
-	err := interp.Evaluate("set foo bar")
+	result, _, err := interp.Evaluate("set foo bar")
 	if err != nil {
 		t.Error("failed to invoke command set")
 	}
-	if interp.result != "bar" {
+	if result != "bar" {
 		t.Error("set failed to affect result of interpreter")
 	}
 	val, err := interp.GetVariable("foo")
@@ -249,11 +183,11 @@ func TestInterpEvaluateVariable(t *testing.T) {
 	if err != nil {
 		t.Error("failed to set variable")
 	}
-	err = interp.Evaluate("set $foo quux")
+	result, _, err := interp.Evaluate("set $foo quux")
 	if err != nil {
 		t.Errorf("failed to reference variable: %s", err)
 	}
-	if interp.result != "quux" {
+	if result != "quux" {
 		t.Error("var ref failed to affect result of interpreter")
 	}
 	val, err := interp.GetVariable("bar")
@@ -264,7 +198,3 @@ func TestInterpEvaluateVariable(t *testing.T) {
 		t.Errorf("unexpected value '%s' for variable bar", val)
 	}
 }
-
-// TODO: test evaluate nested command
-// TODO: test evaluate braced string
-// TODO: test evaluate quoted string
