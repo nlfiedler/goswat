@@ -16,12 +16,12 @@ import (
 func evaluateAndCompare(interp Interpreter, values map[string]string, t *testing.T) {
 	eval := newEvaluator(interp)
 	for k, v := range values {
-		r, _, e := eval.Evaluate(k)
-		if e != nil {
+		r := eval.Evaluate(k)
+		if !r.Ok() {
 			if v != "error" {
-				t.Errorf("evaluation of '%s' failed: %s", k, e)
+				t.Errorf("evaluation of '%s' failed: %s", k, r.Error())
 			}
-		} else if r != v {
+		} else if r.Result() != v {
 			t.Errorf("evaluation of '%s' resulted in '%s'", k, r)
 		}
 	}
@@ -32,11 +32,11 @@ func evaluateAndCompare(interp Interpreter, values map[string]string, t *testing
 func evaluateForError(interp Interpreter, values map[string]string, t *testing.T) {
 	eval := newEvaluator(interp)
 	for k, v := range values {
-		_, _, e := eval.Evaluate(k)
-		if e == nil {
+		r := eval.Evaluate(k)
+		if r.Ok() {
 			t.Errorf("evaluation of '%s' should have faild with '%s'", k, v)
-		} else if !strings.Contains(e.String(), v) {
-			t.Errorf("evaluation of '%s' yielded wrong error: '%s'", k, e)
+		} else if !strings.Contains(r.Error(), v) {
+			t.Errorf("evaluation of '%s' yielded wrong error: '%s'", k, r)
 		}
 	}
 }
@@ -44,22 +44,24 @@ func evaluateForError(interp Interpreter, values map[string]string, t *testing.T
 func TestExprInteger(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
-	values["123"] = "123"
-	values["0xcafebabe"] = "3405691582"
-	values["0126547"] = "44391"
+	// force coercion of numbers by using operators
+	values["0 + 123"] = "123"
+	values["0 + 0xcafebabe"] = "3405691582"
+	values["0 + 0126547"] = "44391"
 	evaluateAndCompare(i, values, t)
 }
 
 func TestExprFloat(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
-	values["1.23"] = "1.23"
-	values["3."] = "3"
-	values["0.0001"] = "0.0001"
-	values["6E4"] = "60000"
-	values["7.91e+16"] = "7.91e+16"
-	values["1e+012"] = "1e+12"
-	values["4.4408920985006262e-016"] = "4.440892098500626e-16"
+	// force coercion of numbers by using operators
+	values["0 + 1.23"] = "1.23"
+	values["0 + 3."] = "3"
+	values["0 + 0.0001"] = "0.0001"
+	values["0 + 6E4"] = "60000"
+	values["0 + 7.91e+16"] = "7.91e+16"
+	values["0 + 1e+012"] = "1e+12"
+	values["0 + 4.4408920985006262e-016"] = "4.440892098500626e-16"
 	evaluateAndCompare(i, values, t)
 }
 
@@ -78,12 +80,12 @@ func TestExprString(t *testing.T) {
 func TestExprMissingParen(t *testing.T) {
 	i := NewInterpreter()
 	eval := newEvaluator(i)
-	_, _, err := eval.Evaluate("(1 + 2")
-	if err == nil {
+	r := eval.Evaluate("(1 + 2")
+	if r.Ok() {
 		t.Error("expected missing close paren to fail")
 	}
-	_, _, err = eval.Evaluate("1 + 2)")
-	if err == nil {
+	r = eval.Evaluate("1 + 2)")
+	if r.Ok() {
 		t.Error("expected missing open paren to fail")
 	}
 }
@@ -91,12 +93,12 @@ func TestExprMissingParen(t *testing.T) {
 func TestExprNestedCmd(t *testing.T) {
 	i := NewInterpreter()
 	eval := newEvaluator(i)
-	result, _, err := eval.Evaluate("[expr 8.2 + 6]")
-	if err != nil {
-		t.Errorf("evaluating nested [expr] failed: %s", err)
+	r := eval.Evaluate("[expr 8.2 + 6]")
+	if !r.Ok() {
+		t.Errorf("evaluating nested [expr] failed: %s", r.Error())
 	}
-	if result != "14.2" {
-		t.Errorf("nested [expr] returned wrong result: '%s'", result)
+	if r.Result() != "14.2" {
+		t.Errorf("nested [expr] returned wrong result: '%s'", r)
 	}
 }
 
@@ -104,11 +106,11 @@ func TestExprVariable(t *testing.T) {
 	i := NewInterpreter()
 	i.SetVariable("foo", "8.2")
 	eval := newEvaluator(i)
-	result, _, err := eval.Evaluate("[expr $foo + 6]")
-	if err != nil {
-		t.Errorf("evaluating nested [expr] failed: %s", err)
+	r := eval.Evaluate("[expr $foo + 6]")
+	if !r.Ok() {
+		t.Errorf("evaluating nested [expr] failed: %s", r.Error())
 	}
-	if result != "14.2" {
-		t.Errorf("nested [expr] returned wrong result: '%s'", result)
+	if r.Result() != "14.2" {
+		t.Errorf("nested [expr] returned wrong result: '%s'", r)
 	}
 }

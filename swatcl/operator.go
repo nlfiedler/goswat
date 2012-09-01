@@ -37,7 +37,7 @@ type operatorNode struct {
 }
 
 // newOperatorNode constructs an operator node based on the given attributes.
-func newOperatorNode(eval Evaluator, token token, arity int) *operatorNode {
+func newOperatorNode(eval Evaluator, token token, arity int) OperatorNode {
 	text := token.contents()
 	node := &operatorNode{exprNode{token.typ, text, eval}, arity, nil, nil, 0, false}
 	// determine operator precedence
@@ -115,38 +115,36 @@ func (o *operatorNode) setRight(right ExprNode) {
 
 // evaluate will evaluate the left and right children (or just the right child
 // for unary operators) and invoke the operation, returning the result.
-func (o *operatorNode) evaluate() (interface{}, returnCode, *TclError) {
-	var result interface{}
+func (o *operatorNode) evaluate() TclResult {
+	var result TclResult = nil
+	right := o.right.evaluate()
+	if !right.Ok() {
+		return right
+	}
+	rnum, err := coerceNumber(right.Result())
+	if err != nil {
+		return newTclResultError(ESYNTAX, err.Error())
+	}
 	if o.arity == 1 {
-		right, code, err := o.right.evaluate()
-		if err != nil {
-			return nil, code, err
-		}
-		if right == nil {
-			return nil, returnError, NewTclError(EOPERAND, o.text+" cannot operate on nil")
+		if right.Result() == "" {
+			return newTclResultErrorf(EARGUMENT, "%s cannot operate on nil", o.text)
 		}
 		if o.text == "+" {
-			result, err = operatorUnaryPlus(right)
+			result = operatorUnaryPlus(rnum)
 		} else if o.text == "-" {
-			result, err = operatorUnaryMinus(right)
+			result = operatorUnaryMinus(rnum)
 		} else {
-			return nil, returnError, NewTclError(EOPERATOR, "unsupported unary operator: "+o.text)
+			return newTclResultErrorf(ECOMMAND, "unsupported unary operator '%s'", o.text)
 		}
-		if err != nil {
-			return nil, returnError, err
-		}
-		return result, returnOk, nil
+		return result
 	}
-	left, code, err := o.left.evaluate()
+	left := o.left.evaluate()
+	if !left.Ok() {
+		return left
+	}
+	lnum, err := coerceNumber(left.Result())
 	if err != nil {
-		return nil, code, err
-	}
-	right, code, err := o.right.evaluate()
-	if err != nil {
-		return nil, code, err
-	}
-	if left == nil || right == nil {
-		return nil, returnError, NewTclError(EOPERAND, o.text+" cannot operate on nil")
+		return newTclResultError(ESYNTAX, err.Error())
 	}
 	// TODO: based on the operator token, call the appropriate function with the operand(s)
 	// TODO: see http://www.tcl.tk/man/tcl8.5/TclCmd/expr.htm for details
@@ -154,22 +152,22 @@ func (o *operatorNode) evaluate() (interface{}, returnCode, *TclError) {
 	// case "~", "!":
 	// case "**":
 	case "%":
-		result, err = operatorRemainder(left, right)
+		result = operatorRemainder(lnum, rnum)
 	case "*":
-		result, err = operatorMultiply(left, right)
+		result = operatorMultiply(lnum, rnum)
 	case "/":
-		result, err = operatorDivide(left, right)
+		result = operatorDivide(lnum, rnum)
 	case "+":
-		result, err = operatorBinaryPlus(left, right)
+		result = operatorBinaryPlus(lnum, rnum)
 	case "-":
-		result, err = operatorBinaryMinus(left, right)
+		result = operatorBinaryMinus(lnum, rnum)
 	// case "<<", ">>":
 	// case "<", ">", "<=", ">=":
 	// case "in", "ni":
 	case "eq":
-		result, err = operatorStringEqual(left, right)
+		result = operatorStringEqual(lnum, rnum)
 	case "ne":
-		result, err = operatorStringNotEqual(left, right)
+		result = operatorStringNotEqual(lnum, rnum)
 	// case "&":
 	// case "^":
 	// case "|":
@@ -179,144 +177,145 @@ func (o *operatorNode) evaluate() (interface{}, returnCode, *TclError) {
 	default:
 		panic(fmt.Sprintf("unknown operator '%s'", o.text))
 	}
-	if err != nil {
-		return nil, returnError, err
-	}
-	return result, returnOk, nil
+	return result
+}
+
+// newOperatorResult converts the value to a string and constructs a TclResult
+// to hold it for later reference.
+func newOperatorResult(val interface{}) TclResult {
+	return newTclResultOk(fmt.Sprint(val))
 }
 
 // operatorUnaryPlus performs the plus (+) unary operation.
-func operatorUnaryPlus(val interface{}) (interface{}, *TclError) {
+func operatorUnaryPlus(val interface{}) TclResult {
 	switch n := val.(type) {
 	case nil:
-		return nil, NewTclError(EOPERAND, "cannot operate on nil")
-	case int64:
-		return 0 + n, nil
+		return newTclResultError(EARGUMENT, "+ cannot operate on nil")
 	case float64:
-		return 0 + n, nil
+		return newOperatorResult(0 + n)
+	case int64:
+		return newOperatorResult(0 + n)
 	default:
-		return nil, NewTclError(EOPERAND,
-			fmt.Sprintf("unsupported operand type '%T' for '%s'", n, val))
+		return newTclResultErrorf(EARGUMENT, "unsupported operand type '%T' for '%s'", n, val)
 	}
 	panic("unreachable code")
 }
 
 // operatorBinaryPlus performs the plus (+) binary operation.
-func operatorBinaryPlus(left, right interface{}) (interface{}, *TclError) {
+func operatorBinaryPlus(left, right interface{}) TclResult {
 	lf, lf_ok := left.(float64)
 	rf, rf_ok := right.(float64)
 	li, li_ok := left.(int64)
 	ri, ri_ok := right.(int64)
 	if lf_ok && rf_ok {
-		return lf + rf, nil
+		return newOperatorResult(lf + rf)
 	} else if lf_ok && ri_ok {
-		return lf + float64(ri), nil
+		return newOperatorResult(lf + float64(ri))
 	} else if li_ok && rf_ok {
-		return float64(li) + rf, nil
+		return newOperatorResult(float64(li) + rf)
 	} else if li_ok && ri_ok {
-		return li + ri, nil
+		return newOperatorResult(li + ri)
 	}
-	return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
+	return newTclResultError(EARGUMENT, "cannot operate on non-numeric values")
 }
 
 // operatorUnaryMinus performs the minus (-) unary operation.
-func operatorUnaryMinus(val interface{}) (interface{}, *TclError) {
+func operatorUnaryMinus(val interface{}) TclResult {
 	switch n := val.(type) {
 	case nil:
-		return nil, NewTclError(EOPERAND, "cannot operate on nil")
-	case int64:
-		return 0 - n, nil
+		return newTclResultError(EARGUMENT, "- cannot operate on nil")
 	case float64:
-		return 0 - n, nil
+		return newOperatorResult(0 - n)
+	case int64:
+		return newOperatorResult(0 - n)
 	default:
-		return nil, NewTclError(EOPERAND,
-			fmt.Sprintf("unsupported operand type '%T' for '%s'", n, val))
+		return newTclResultErrorf(EARGUMENT, "unsupported operand type '%T' for '%s'", n, val)
 	}
 	panic("unreachable code")
 }
 
 // operatorBinaryMinus performs the minus (-) binary operation.
-func operatorBinaryMinus(left, right interface{}) (interface{}, *TclError) {
+func operatorBinaryMinus(left, right interface{}) TclResult {
 	lf, lf_ok := left.(float64)
 	rf, rf_ok := right.(float64)
 	li, li_ok := left.(int64)
 	ri, ri_ok := right.(int64)
 	if lf_ok && rf_ok {
-		return lf - rf, nil
+		return newOperatorResult(lf - rf)
 	} else if lf_ok && ri_ok {
-		return lf - float64(ri), nil
+		return newOperatorResult(lf - float64(ri))
 	} else if li_ok && rf_ok {
-		return float64(li) - rf, nil
+		return newOperatorResult(float64(li) - rf)
 	} else if li_ok && ri_ok {
-		return li - ri, nil
+		return newOperatorResult(li - ri)
 	}
-	return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
+	return newTclResultError(EARGUMENT, "cannot operate on non-numeric values")
 }
 
 // operatorMultiply performs the multiplication (*) binary operator.
-func operatorMultiply(left, right interface{}) (interface{}, *TclError) {
+func operatorMultiply(left, right interface{}) TclResult {
 	lf, lf_ok := left.(float64)
 	rf, rf_ok := right.(float64)
 	li, li_ok := left.(int64)
 	ri, ri_ok := right.(int64)
 	if lf_ok && rf_ok {
-		return lf * rf, nil
+		return newOperatorResult(lf * rf)
 	} else if lf_ok && ri_ok {
-		return lf * float64(ri), nil
+		return newOperatorResult(lf * float64(ri))
 	} else if li_ok && rf_ok {
-		return float64(li) * rf, nil
+		return newOperatorResult(float64(li) * rf)
 	} else if li_ok && ri_ok {
-		return li * ri, nil
+		return newOperatorResult(li * ri)
 	}
-	return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
+	return newTclResultError(EARGUMENT, "cannot operate on non-numeric values")
 }
 
 // operatorDivide performs the division (/) binary operator.
-func operatorDivide(left, right interface{}) (interface{}, *TclError) {
+func operatorDivide(left, right interface{}) TclResult {
 	lf, lf_ok := left.(float64)
 	rf, rf_ok := right.(float64)
 	li, li_ok := left.(int64)
 	ri, ri_ok := right.(int64)
 	if lf_ok && rf_ok {
-		return lf / rf, nil
+		return newOperatorResult(lf / rf)
 	} else if lf_ok && ri_ok {
-		return lf / float64(ri), nil
+		return newOperatorResult(lf / float64(ri))
 	} else if li_ok && rf_ok {
-		return float64(li) / rf, nil
+		return newOperatorResult(float64(li) / rf)
 	} else if li_ok && ri_ok {
-		return li / ri, nil
+		return newOperatorResult(li / ri)
 	}
-	return nil, NewTclError(EOPERAND, "cannot operate on non-numeric values")
+	return newTclResultError(EARGUMENT, "cannot operate on non-numeric values")
 }
 
 // operatorRemainder performs the remainder (%) binary operator.
-func operatorRemainder(left, right interface{}) (interface{}, *TclError) {
+func operatorRemainder(left, right interface{}) TclResult {
 	li, li_ok := left.(int64)
 	ri, ri_ok := right.(int64)
 	if li_ok && ri_ok {
-		return li % ri, nil
+		return newOperatorResult(li % ri)
 	}
-	return nil, NewTclError(EOPERAND, "cannot operate on non-integer values")
+	return newTclResultError(EARGUMENT, "cannot operate on non-integer values")
 }
 
 // operatorStringEqual converts both arugments to strings and compares them,
 // returning 1 if they are equal and 0 otherwise.
-func operatorStringEqual(left, right interface{}) (interface{}, *TclError) {
+func operatorStringEqual(left, right interface{}) TclResult {
 	ls := fmt.Sprint(left)
 	rs := fmt.Sprint(right)
 	if ls == rs {
-		return 1, nil
+		return newTclResultOk("1")
 	}
-	return 0, nil
+	return newTclResultOk("0")
 }
 
 // operatorStringNotEqual converts both arugments to strings and compares
 // them, returning 1 if they are _not_ equal and 0 otherwise.
-func operatorStringNotEqual(left, right interface{}) (interface{}, *TclError) {
+func operatorStringNotEqual(left, right interface{}) TclResult {
 	ls := fmt.Sprint(left)
 	rs := fmt.Sprint(right)
 	if ls == rs {
-		return 0, nil
+		return newTclResultOk("0")
 	}
-	return 1, nil
+	return newTclResultOk("1")
 }

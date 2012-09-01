@@ -24,6 +24,7 @@ package swatcl
 
 import (
 	"code.google.com/p/goswat/container/vector"
+	"errors"
 	"fmt"
 )
 
@@ -42,7 +43,7 @@ const (
 // ExprNode represents a node in the expression tree that can be evaluated
 // to a final value.
 type ExprNode interface {
-	evaluate() (interface{}, returnCode, *TclError)
+	evaluate() TclResult
 	getText() string
 }
 
@@ -70,40 +71,38 @@ func (n *exprNode) String() string {
 }
 
 // evaluate evaluates the expression node appropriately based on its type.
-func (n *exprNode) evaluate() (interface{}, returnCode, *TclError) {
+func (n *exprNode) evaluate() TclResult {
 	switch n.token {
 	case tokenVariable:
-		str, err := n.eval.GetVariable(n.text)
+		val, err := n.eval.GetVariable(n.text)
 		if err != nil {
-			return "", returnError, err
+			return newTclResultError(EVARIABLE, err.Error())
 		}
-		return coerceNumber(str)
+		return newTclResultOk(val)
 	case tokenCommand:
 		return n.eval.Interpret(n.text)
-	case tokenInteger:
-		return atoi(n.text)
-	case tokenFloat:
-		return atof(n.text)
 	case tokenString, tokenQuote:
 		// perform basic string substitution (slash escapes)
-		return evalString(n.text)
-	case tokenBrace:
-		// return the string as-is
-		return n.text, returnOk, nil
+		str, err := evalString(n.text)
+		if err != nil {
+			return newTclResultError(ESYNTAX, err.Error())
+		}
+		return newTclResultOk(str)
 	}
-	return "", returnOk, nil
+	// For all others, return the input as-is (e.g. numbers, strings).
+	return newTclResultOk(n.text)
 }
 
 // Evaluator knows how to evaluate a Tcl expression.
 type Evaluator interface {
 	// Evaluate parses the expression, evaluates it, and returns the
 	// result.
-	Evaluate(expr string) (string, returnCode, *TclError)
+	Evaluate(expr string) TclResult
 	// Interpret passes the expression to the associated interpreter and
 	// returns the result.
-	Interpret(expr string) (string, returnCode, *TclError)
+	Interpret(expr string) TclResult
 	// GetVariable retrieves a variable from the interpreter.
-	GetVariable(name string) (string, *TclError)
+	GetVariable(name string) (string, error)
 }
 
 // evaluator is an implementation of the Evaluator interface.
@@ -156,7 +155,7 @@ func (e *evaluator) dumpStacks() {
 
 // Reduce the operator stack by one. If the element at the top of the operator
 // stack is a sentinel, no change is made.
-func (e *evaluator) reduce() *TclError {
+func (e *evaluator) reduce() error {
 	// If there is a binary operator on top of the operator stack, there
 	// should be two trees on top of the argument stack, both representing
 	// expressions. Pop the operator and two trees off of the argument
@@ -165,47 +164,46 @@ func (e *evaluator) reduce() *TclError {
 	// stack represent the right and left arguments, respectively.
 	top, ok := e.operators.Pop().(OperatorNode)
 	if !ok {
-		return NewTclError(EBADSTATE, "node on operator stack is not an operator!")
+		return errors.New("node on operator stack is not an operator")
 	}
 	if top.isSentinel() {
 		// Cleverly do nothing and let the caller handle it.
 	} else if top.getArity() == 2 {
 		if e.arguments.Len() < 2 {
 			e.dumpStacks()
-			return NewTclError(EOPERAND, "operator requires two arguments")
+			return errors.New("operator requires two arguments")
 		}
 		arg2, ok := e.arguments.Pop().(ExprNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "second argument is not an exprNode!")
+			return errors.New("second argument is not an exprNode")
 		}
 		arg1, ok := e.arguments.Pop().(ExprNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "first argument is not an exprNode!")
+			return errors.New("first argument is not an exprNode")
 		}
 		top.setLeft(arg1)
 		top.setRight(arg2)
 		e.arguments.Push(top)
 	} else if top.getArity() == 1 {
 		if e.arguments.Len() < 1 {
-			return NewTclError(EOPERAND, "operator requires one argument")
+			return errors.New("operator requires one argument")
 		}
 		node := e.arguments.Pop()
 		arg, ok := node.(ExprNode)
 		if !ok {
-			msg := fmt.Sprintf("expected exprNode for single argument, got %T", node)
-			return NewTclError(EBADSTATE, msg)
+			return errors.New("node on argument stack is not an ExprNode")
 		}
 		top.setRight(arg)
 		e.arguments.Push(top)
 	} else {
-		return NewTclError(EOPERATOR, "unknown operator "+top.getText())
+		return errors.New("unknown operator " + top.getText())
 	}
 	return nil
 }
 
 // handleEOF reduces the operator stack, if there is anything on the
 // stack, and then sets the resulting argument node to the root.
-func (e *evaluator) handleEOF() *TclError {
+func (e *evaluator) handleEOF() error {
 	// If there is only one tree on the argument stack and the
 	// operator stack is empty, return the single tree as the
 	// result. If there are more trees and/or operators, reduce the
@@ -214,31 +212,31 @@ func (e *evaluator) handleEOF() *TclError {
 	for e.operators.Len() > 0 {
 		top, ok := e.operators.Last().(OperatorNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
+			return errors.New("node on operator stack is not an operatorNode")
 		}
 		if top.getText() == "(" {
-			return NewTclError(EPAREN, "unmatched left parenthesis")
+			return errors.New("unmatched left parenthesis")
 		}
 		if top.isSentinel() {
-			return NewTclError(EBADEXPR, "sentinel operator encountered")
+			return errors.New("sentinel operator encountered")
 		}
 		err := e.reduce()
 		if err != nil {
 			return err
 		}
 		if count++; count > 500 {
-			return NewTclError(EBADSTATE, "operator stack too large")
+			return errors.New("operator stack too large")
 		}
 	}
 	if e.arguments.Len() > 0 {
 		topArg, ok := e.arguments.Pop().(ExprNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "node on argument stack is not an ExprNode!")
+			return errors.New("node on argument stack is not an ExprNode")
 		}
 		if e.arguments.Len() == 0 && e.operators.Len() == 0 {
 			e.root = topArg
 		} else {
-			return NewTclError(EBADSTATE, "argument stack is not empty")
+			return errors.New("argument stack is not empty")
 		}
 	}
 	return nil
@@ -246,9 +244,9 @@ func (e *evaluator) handleEOF() *TclError {
 
 // handleCloseParen reduces the operator stack until it find the
 // left parenthesis, signaling an error if this does not succeed.
-func (e *evaluator) handleCloseParen() *TclError {
+func (e *evaluator) handleCloseParen() error {
 	if e.operators.Len() == 0 {
-		return NewTclError(EPAREN, "unmatched right parenthesis")
+		return errors.New("unmatched right parenthesis")
 	}
 	// If there is a left parenthesis on the operator stack, we can
 	// "cancel" the pair. If the operator stack contains some other
@@ -260,7 +258,7 @@ func (e *evaluator) handleCloseParen() *TclError {
 			return err
 		}
 		if e.operators.Len() == 0 {
-			return NewTclError(EPAREN, "unmatched right parenthesis")
+			return errors.New("unmatched right parenthesis")
 		}
 		top, ok = e.operators.Last().(OperatorNode)
 	}
@@ -298,17 +296,17 @@ func (e *evaluator) handleCloseParen() *TclError {
 // handleComma attempts to reduce the operator stack with the assumption
 // that the comma is being used to separate arguments to a function
 // invocation.
-func (e *evaluator) handleComma() *TclError {
+func (e *evaluator) handleComma() error {
 	if e.funcCount == 0 {
-		return NewTclError(EBADEXPR, "found comma outside function call")
+		return errors.New("found comma outside function call")
 	} else {
 		// Reduce the operator stack to the left parenthesis.
 		if e.operators.Len() < 2 {
-			return NewTclError(EBADEXPR, "found comma outside function call")
+			return errors.New("found comma outside function call")
 		}
 		top, ok := e.operators.Last().(OperatorNode)
 		if !ok {
-			return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
+			return errors.New("node on operator stack is not an operatorNode")
 		}
 		for !top.isSentinel() {
 			err := e.reduce()
@@ -317,7 +315,7 @@ func (e *evaluator) handleComma() *TclError {
 			}
 			top, ok = e.operators.Last().(OperatorNode)
 			if !ok {
-				return NewTclError(EBADSTATE, "node on operator stack is not an operatorNode!")
+				return errors.New("node on operator stack is not an operatorNode")
 			}
 		}
 	}
@@ -326,7 +324,7 @@ func (e *evaluator) handleComma() *TclError {
 
 // forcePrecedence will reduce the operator stack if the new node has higher
 // precedence than the operators currently on the stack.
-func (e *evaluator) forcePrecedence(node OperatorNode) *TclError {
+func (e *evaluator) forcePrecedence(node OperatorNode) error {
 	// If the operator stack is empty, push the new operator.
 	// If it has an operator on top, compare the precedence
 	// of the two and push the new one if it has lower precedence
@@ -335,8 +333,7 @@ func (e *evaluator) forcePrecedence(node OperatorNode) *TclError {
 	if e.operators.Len() > 0 {
 		top, ok := e.operators.Last().(OperatorNode)
 		if !ok {
-			return NewTclError(EBADSTATE,
-				"node on operator stack is not an operatorNode!")
+			return errors.New("node on operator stack is not an operatorNode!")
 		}
 		if !top.isSentinel() && node.getPrecedence() >= top.getPrecedence() {
 			err := e.reduce()
@@ -352,7 +349,7 @@ func (e *evaluator) forcePrecedence(node OperatorNode) *TclError {
 // returning the result. Supported expressions include variable references,
 // nested commands (inside square brackets), string and numeric literals, and
 // math and type coercion functions.
-func (e *evaluator) Evaluate(expr string) (string, returnCode, *TclError) {
+func (e *evaluator) Evaluate(expr string) TclResult {
 	// reset the evaluator so it is ready for a new expression
 	e.state = searchArgument
 	e.arguments = nil
@@ -365,12 +362,12 @@ func (e *evaluator) Evaluate(expr string) (string, returnCode, *TclError) {
 	// pull tokens from lexer, building the expression tree
 	for tok := range c {
 		if tok.typ == tokenError {
-			return "", returnError, NewTclError(ELEXER, tok.val)
+			return newTclResultErrorf(ESYNTAX, "swatcl: lexer error for '%s'", tok.val)
 
 		} else if tok.typ == tokenEOF {
 			err := e.handleEOF()
 			if err != nil {
-				return "", returnError, err
+				return newTclResultError(EBADSTATE, err.Error())
 			}
 			break
 
@@ -384,7 +381,7 @@ func (e *evaluator) Evaluate(expr string) (string, returnCode, *TclError) {
 
 		} else if tok.typ == tokenOperator {
 			// based on search state, it's either a unary or binary operator
-			var node *operatorNode
+			var node OperatorNode
 			if e.state == searchOperator {
 				node = newOperatorNode(e, tok, 2)
 			} else if e.state == searchArgument {
@@ -415,7 +412,7 @@ func (e *evaluator) Evaluate(expr string) (string, returnCode, *TclError) {
 				// If not open paren, then it is close paren.
 				err := e.handleCloseParen()
 				if err != nil {
-					return "", returnError, err
+					return newTclResultError(EBADSTATE, err.Error())
 				}
 			}
 
@@ -426,23 +423,19 @@ func (e *evaluator) Evaluate(expr string) (string, returnCode, *TclError) {
 	}
 
 	if e.root == nil {
-		panic("expression parsing failed!")
+		return newTclResultError(EBADSTATE, "expression parsing failed!")
 	}
-	result, code, err := e.root.evaluate()
-	if err != nil {
-		return "", returnError, err
-	}
-	return fmt.Sprint(result), code, nil
+	return e.root.evaluate()
 }
 
 // Interpret passes the expression to the Tcl interpreter associated with
 // this evaluator and returns the result.
-func (e *evaluator) Interpret(expr string) (string, returnCode, *TclError) {
+func (e *evaluator) Interpret(expr string) TclResult {
 	return e.interp.Evaluate(expr)
 }
 
 // GetVariable retrieves the value for the named variable from the
 // interpreter.
-func (e *evaluator) GetVariable(name string) (string, *TclError) {
+func (e *evaluator) GetVariable(name string) (string, error) {
 	return e.interp.GetVariable(name)
 }

@@ -8,7 +8,6 @@ package swatcl
 
 import (
 	"code.google.com/p/goswat/container/vector"
-	"fmt"
 	"math"
 	"math/rand"
 	"strings"
@@ -41,7 +40,7 @@ func (f *functionNode) PushArgument(a interface{}) {
 }
 
 // functionTable maps Tcl expression functions to implementations.
-var functionTable = make(map[string]func([]interface{}) (interface{}, *TclError))
+var functionTable = make(map[string]func([]interface{}) TclResult)
 
 func populateFunctionTable() {
 	functionTable["abs"] = tclAbs
@@ -65,33 +64,34 @@ func populateFunctionTable() {
 
 // evaluate will evalute the function arguments and then invoke the function
 // using those arguments, returning the result.
-func (f *functionNode) evaluate() (interface{}, returnCode, *TclError) {
+func (f *functionNode) evaluate() TclResult {
 	if len(functionTable) == 0 {
 		populateFunctionTable()
 	}
 	fn := functionTable[f.text]
 	if fn == nil {
-		return nil, returnError, NewTclError(ENOFUNC, "unsupported function "+f.text)
+		return newTclResultErrorf(ECOMMAND, "unsupported function '%s'", f.text)
 	}
 	// evaluate the arguments and invoke the function
+	var result TclResult
 	args := make([]interface{}, 0, len(f.arguments))
 	for _, a := range f.arguments {
 		en, ok := a.(ExprNode)
 		if !ok {
-			msg := fmt.Sprintf("function argument wrong type: '%v' (%T)", a, a)
-			return nil, returnError, NewTclError(EILLARG, msg)
+			return newTclResultErrorf(EARGUMENT, "function argument wrong type: '%v' (%T)", a, a)
 		}
-		val, code, err := en.evaluate()
+		result = en.evaluate()
+		if !result.Ok() {
+			return result
+		}
+		// try to coerce the values into numbers
+		val, err := coerceNumber(result.Result())
 		if err != nil {
-			return nil, code, err
+			return newTclResultError(ESYNTAX, err.Error())
 		}
 		args = append(args, val)
 	}
-	result, err := fn(args)
-	if err != nil {
-		return result, returnError, err
-	}
-	return result, returnOk, err
+	return fn(args)
 }
 
 // getText returns the name of the function.
@@ -125,117 +125,121 @@ func (f *functionNode) setRight(right ExprNode) {
 }
 
 // tclAbs implements the tcl::mathfunc::abs command.
-func tclAbs(args []interface{}) (interface{}, *TclError) {
+func tclAbs(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "abs() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "abs() takes exactly one argument")
 	}
+	var result interface{} = nil
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Abs(fl), nil
+		result = math.Abs(fl)
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return int64(math.Abs(float64(in))), nil
+		result = int64(math.Abs(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "abs() takes only ints and floats")
+	if result != nil {
+		return newOperatorResult(result)
+	}
+	return newTclResultError(EARGUMENT, "abs() takes only ints and floats")
 }
 
 // tclBool implements the tcl::mathfunc::bool command.
-func tclBool(args []interface{}) (interface{}, *TclError) {
+func tclBool(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "bool() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "bool() takes exactly one argument")
 	}
 	fl, ok := args[0].(float64)
 	if ok {
-		return fl != 0, nil
+		return newOperatorResult(fl != 0)
 	}
 	in, ok := args[0].(int64)
 	if ok {
-		return in != 0, nil
+		return newOperatorResult(in != 0)
 	}
 	str, ok := args[0].(string)
 	if ok {
 		str = strings.ToLower(str)
 		switch str {
 		case "0", "false", "no", "off":
-			return false, nil
+			return newOperatorResult(false)
 		case "1", "true", "yes", "on":
-			return true, nil
+			return newOperatorResult(true)
 		default:
-			return nil, NewTclError(EILLARG, "expected 'string is boolean' value")
+			return newTclResultError(EARGUMENT, "expected 'string is boolean' value")
 		}
 	}
-	return nil, NewTclError(EILLARG, "bool() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "bool() takes only ints and floats")
 }
 
 // tclCeil implements the tcl::mathfunc::ceil command.
-func tclCeil(args []interface{}) (interface{}, *TclError) {
+func tclCeil(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "ceil() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "ceil() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Ceil(fl), nil
+		return newOperatorResult(math.Ceil(fl))
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return math.Ceil(float64(in)), nil
+		return newOperatorResult(math.Ceil(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "ceil() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "ceil() takes only ints and floats")
 }
 
 // tclDouble implements the tcl::mathfunc::double command.
-func tclDouble(args []interface{}) (interface{}, *TclError) {
+func tclDouble(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "double() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "double() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return fl, nil
+		return newOperatorResult(fl)
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return float64(in), nil
+		return newOperatorResult(float64(in))
 	}
-	return nil, NewTclError(EILLARG, "double() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "double() takes only ints and floats")
 }
 
 // tclExp implements the tcl::mathfunc::exp command.
-func tclExp(args []interface{}) (interface{}, *TclError) {
+func tclExp(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "exp() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "exp() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Exp(fl), nil
+		return newOperatorResult(math.Exp(fl))
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return math.Exp(float64(in)), nil
+		return newOperatorResult(math.Exp(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "exp() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "exp() takes only ints and floats")
 }
 
 // tclFloor implements the tcl::mathfunc::floor command.
-func tclFloor(args []interface{}) (interface{}, *TclError) {
+func tclFloor(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "floor() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "floor() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Floor(fl), nil
+		return newOperatorResult(math.Floor(fl))
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return math.Floor(float64(in)), nil
+		return newOperatorResult(math.Floor(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "floor() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "floor() takes only ints and floats")
 }
 
 // tclFmod implements the tcl::mathfunc::fmod command.
-func tclFmod(args []interface{}) (interface{}, *TclError) {
+func tclFmod(args []interface{}) TclResult {
 	if len(args) != 2 {
-		return nil, NewTclError(EILLARG, "fmod() takes exactly two arguments")
+		return newTclResultError(EARGUMENT, "fmod() takes exactly two arguments")
 	}
 	flx, flok := args[0].(float64)
 	if !flok {
@@ -243,7 +247,7 @@ func tclFmod(args []interface{}) (interface{}, *TclError) {
 		if inok {
 			flx = float64(in)
 		} else {
-			return nil, NewTclError(EILLARG, "fmod() takes only ints and floats")
+			return newTclResultError(EARGUMENT, "fmod() takes only ints and floats")
 		}
 	}
 	fly, flok := args[1].(float64)
@@ -252,48 +256,48 @@ func tclFmod(args []interface{}) (interface{}, *TclError) {
 		if inok {
 			fly = float64(in)
 		} else {
-			return nil, NewTclError(EILLARG, "fmod() takes only ints and floats")
+			return newTclResultError(EARGUMENT, "fmod() takes only ints and floats")
 		}
 	}
-	return math.Mod(flx, fly), nil
+	return newOperatorResult(math.Mod(flx, fly))
 }
 
 // tclLog implements the tcl::mathfunc::log command.
-func tclLog(args []interface{}) (interface{}, *TclError) {
+func tclLog(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "log() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "log() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Log(fl), nil
+		return newOperatorResult(math.Log(fl))
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return math.Log(float64(in)), nil
+		return newOperatorResult(math.Log(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "log() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "log() takes only ints and floats")
 }
 
 // tclLog10 implements the tcl::mathfunc::log10 command.
-func tclLog10(args []interface{}) (interface{}, *TclError) {
+func tclLog10(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "log10() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "log10() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Log10(fl), nil
+		return newOperatorResult(math.Log10(fl))
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return math.Log10(float64(in)), nil
+		return newOperatorResult(math.Log10(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "log10() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "log10() takes only ints and floats")
 }
 
 // tclMax implements the tcl::mathfunc::max command.
-func tclMax(args []interface{}) (interface{}, *TclError) {
+func tclMax(args []interface{}) TclResult {
 	if len(args) < 1 {
-		return nil, NewTclError(EILLARG, "max() takes at least one argument")
+		return newTclResultError(EARGUMENT, "max() takes at least one argument")
 	}
 	// scan to check that all arguments are numbers
 	// also see if they are all ints or not
@@ -302,7 +306,7 @@ func tclMax(args []interface{}) (interface{}, *TclError) {
 		if _, flok := n.(float64); flok {
 			all_ints = false
 		} else if _, inok := n.(int64); !inok {
-			return nil, NewTclError(EILLARG, "max() takes only ints and floats")
+			return newTclResultError(EARGUMENT, "max() takes only ints and floats")
 		}
 	}
 	if all_ints {
@@ -313,7 +317,7 @@ func tclMax(args []interface{}) (interface{}, *TclError) {
 				max = in
 			}
 		}
-		return max, nil
+		return newOperatorResult(max)
 	} else {
 		var max float64 = math.Inf(-1)
 		for _, n := range args {
@@ -327,15 +331,15 @@ func tclMax(args []interface{}) (interface{}, *TclError) {
 				max = fl
 			}
 		}
-		return max, nil
+		return newOperatorResult(max)
 	}
 	panic("unreachable code")
 }
 
 // tclMin implements the tcl::mathfunc::min command.
-func tclMin(args []interface{}) (interface{}, *TclError) {
+func tclMin(args []interface{}) TclResult {
 	if len(args) < 1 {
-		return nil, NewTclError(EILLARG, "min() takes at least one argument")
+		return newTclResultError(EARGUMENT, "min() takes at least one argument")
 	}
 	// scan to check that all arguments are numbers
 	// also see if they are all ints or not
@@ -344,7 +348,7 @@ func tclMin(args []interface{}) (interface{}, *TclError) {
 		if _, flok := n.(float64); flok {
 			all_ints = false
 		} else if _, inok := n.(int64); !inok {
-			return nil, NewTclError(EILLARG, "min() takes only ints and floats")
+			return newTclResultError(EARGUMENT, "min() takes only ints and floats")
 		}
 	}
 	if all_ints {
@@ -355,7 +359,7 @@ func tclMin(args []interface{}) (interface{}, *TclError) {
 				min = in
 			}
 		}
-		return min, nil
+		return newOperatorResult(min)
 	} else {
 		var min float64 = math.Inf(1)
 		for _, n := range args {
@@ -369,15 +373,15 @@ func tclMin(args []interface{}) (interface{}, *TclError) {
 				min = fl
 			}
 		}
-		return min, nil
+		return newOperatorResult(min)
 	}
 	panic("unreachable code")
 }
 
 // tclPow implements the tcl::mathfunc::pow command.
-func tclPow(args []interface{}) (interface{}, *TclError) {
+func tclPow(args []interface{}) TclResult {
 	if len(args) != 2 {
-		return nil, NewTclError(EILLARG, "pow() takes exactly two arguments")
+		return newTclResultError(EARGUMENT, "pow() takes exactly two arguments")
 	}
 	flx, flok := args[0].(float64)
 	if !flok {
@@ -385,7 +389,7 @@ func tclPow(args []interface{}) (interface{}, *TclError) {
 		if inok {
 			flx = float64(in)
 		} else {
-			return nil, NewTclError(EILLARG, "pow() takes only ints and floats")
+			return newTclResultError(EARGUMENT, "pow() takes only ints and floats")
 		}
 	}
 	fly, flok := args[1].(float64)
@@ -394,53 +398,53 @@ func tclPow(args []interface{}) (interface{}, *TclError) {
 		if inok {
 			fly = float64(in)
 		} else {
-			return nil, NewTclError(EILLARG, "pow() takes only ints and floats")
+			return newTclResultError(EARGUMENT, "pow() takes only ints and floats")
 		}
 	}
-	return math.Pow(flx, fly), nil
+	return newOperatorResult(math.Pow(flx, fly))
 }
 
 // tclRand implements the tcl::mathfunc::rand command.
-func tclRand(args []interface{}) (interface{}, *TclError) {
+func tclRand(args []interface{}) TclResult {
 	if len(args) != 0 {
-		return nil, NewTclError(EILLARG, "rand() takes no arguments")
+		return newTclResultError(EARGUMENT, "rand() takes no arguments")
 	}
-	return rand.Float64(), nil
+	return newOperatorResult(rand.Float64())
 }
 
 // tclSqrt implements the tcl::mathfunc::sqrt command.
-func tclSqrt(args []interface{}) (interface{}, *TclError) {
+func tclSqrt(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "sqrt() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "sqrt() takes exactly one argument")
 	}
 	fl, flok := args[0].(float64)
 	if flok {
-		return math.Sqrt(fl), nil
+		return newOperatorResult(math.Sqrt(fl))
 	}
 	in, inok := args[0].(int64)
 	if inok {
-		return math.Sqrt(float64(in)), nil
+		return newOperatorResult(math.Sqrt(float64(in)))
 	}
-	return nil, NewTclError(EILLARG, "sqrt() takes only ints and floats")
+	return newTclResultError(EARGUMENT, "sqrt() takes only ints and floats")
 }
 
 // tclSrand implements the tcl::mathfunc::srand command.
-func tclSrand(args []interface{}) (interface{}, *TclError) {
+func tclSrand(args []interface{}) TclResult {
 	if len(args) != 1 {
-		return nil, NewTclError(EILLARG, "srand() takes exactly one argument")
+		return newTclResultError(EARGUMENT, "srand() takes exactly one argument")
 	}
 	in, inok := args[0].(int64)
 	if inok {
 		rand.Seed(in)
-		return rand.Float64(), nil
+		return newOperatorResult(rand.Float64())
 	}
-	return nil, NewTclError(EILLARG, "srand() takes only integers")
+	return newTclResultError(EARGUMENT, "srand() takes only integers")
 }
 
 // TODO // tclRound implements the tcl::mathfunc::round command.
-// func tclRound(args []interface{}) (interface{}, *TclError) {
+// func tclRound(args []interface{}) TclResult {
 // 	if len(args) != 1 {
-// 		return nil, NewTclError(EILLARG, "round() takes exactly one argument")
+// 		return newTclResultError(EARGUMENT, "round() takes exactly one argument")
 // 	}
 // 	fl, flok := args[0].(float64)
 // 	if flok {
@@ -450,7 +454,7 @@ func tclSrand(args []interface{}) (interface{}, *TclError) {
 // 	if inok {
 // 		return in, nil
 // 	}
-// 	return nil, NewTclError(EILLARG, "round() takes only ints and floats")
+// 	return newTclResultError(EARGUMENT, "round() takes only ints and floats")
 // }
 
 // TODO: support following math functions

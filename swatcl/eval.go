@@ -24,56 +24,56 @@ func isAlphaNumeric(r rune) bool {
 // coerceNumber attempts to parse the given expression as either an integer or
 // floating point number. Failing that, it returns the input as given. Leading
 // plus and minus signs are honored.
-func coerceNumber(expr string) (interface{}, returnCode, *TclError) {
+func coerceNumber(expr string) (interface{}, error) {
 	// prepare the expression to be lexed
 	pe := expr
 	if len(expr) > 1 && (expr[0] == '-' || expr[0] == '+') {
 		pe = expr[1:]
 	}
-	c := lexExpr("expr", pe)
+	c := lexExpr("coerceNumber", pe)
 	token := <-c
 	if token.typ == tokenFloat {
 		return atof(expr)
 	} else if token.typ == tokenInteger {
 		return atoi(expr)
 	} else {
-		return expr, returnOk, nil
+		return expr, nil
 	}
 	panic("unreachable code")
 }
 
 // atof attempts to coerce the given text into a floating point value,
 // returning an error if unsuccessful.
-func atof(text string) (interface{}, returnCode, *TclError) {
+func atof(text string) (interface{}, error) {
 	v, err := strconv.ParseFloat(text, 64)
 	if err != nil {
 		if err == strconv.ErrSyntax {
 			// the parser messed up if this happens
-			return "", returnError, NewTclError(EINVALNUM, text)
+			return nil, NumberSyntaxInvalid
 		}
 		if err == strconv.ErrRange {
-			return "", returnError, NewTclError(ENUMRANGE, text)
+			return nil, NumberOutOfRange
 		}
 	}
-	return v, returnOk, nil
+	return v, nil
 }
 
 // atoi attempts to coerce the given text into an integer value, returning an
 // error if unsuccessful.
-func atoi(text string) (interface{}, returnCode, *TclError) {
+func atoi(text string) (interface{}, error) {
 	// let strconv detect the number base for us
 	// (either binary, decimal, or hexadecimal)
 	v, err := strconv.ParseInt(text, 0, 64)
 	if err != nil {
 		if err == strconv.ErrSyntax {
 			// the parser messed up if this happens
-			return "", returnError, NewTclError(EINVALNUM, text)
+			return nil, NumberSyntaxInvalid
 		}
 		if err == strconv.ErrRange {
-			return "", returnError, NewTclError(ENUMRANGE, text)
+			return nil, NumberOutOfRange
 		}
 	}
-	return v, returnOk, nil
+	return v, nil
 }
 
 // evalBoolean attempts to interpret the given string as a boolean expression.
@@ -81,7 +81,7 @@ func atoi(text string) (interface{}, returnCode, *TclError) {
 // If expr is "on", "yes", or "true" then the result is true. If expr is
 // "off", "no", or "false" then the result is false. Otherwise an error is
 // returned.
-func evalBoolean(expr string) (bool, *TclError) {
+func evalBoolean(expr string) (bool, error) {
 	n, err := strconv.Atoi(expr)
 	if err == nil {
 		return n != 0, nil
@@ -92,7 +92,7 @@ func evalBoolean(expr string) (bool, *TclError) {
 	} else if s == "true" || s == "yes" || s == "on" {
 		return true, nil
 	}
-	return false, NewTclError(EBADBOOL, "expected 1/0, true/false, yes/no, or on/off")
+	return false, BooleanInvalidSyntax
 }
 
 // hexCharToByte converts the given character to a byte value, where the
@@ -126,10 +126,10 @@ func octCharToByte(r rune) rune {
 // evalString performs string substitution on the given expression, returning
 // the result. This does not handle interpolation of nested commands and
 // variable references.
-func evalString(expr string) (string, returnCode, *TclError) {
+func evalString(expr string) (string, error) {
 	if strings.Index(expr, "\\") == -1 {
 		// nothing to do
-		return expr, returnOk, nil
+		return expr, nil
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, len(expr)))
@@ -142,7 +142,7 @@ func evalString(expr string) (string, returnCode, *TclError) {
 		if unicode > 0 {
 			v := hexCharToByte(c)
 			if v == -1 {
-				return "", returnError, NewTclError(EINVALNUM, "invalid hex character in "+expr)
+				return "", NumberSyntaxInvalid
 			}
 			num = num<<4 + v
 			unicode--
@@ -154,7 +154,7 @@ func evalString(expr string) (string, returnCode, *TclError) {
 		} else if hex > 0 {
 			v := hexCharToByte(c)
 			if v == -1 {
-				return "", returnError, NewTclError(EINVALNUM, "invalid hex character in "+expr)
+				return "", NumberSyntaxInvalid
 			}
 			num = num<<4 + v
 			hex--
@@ -166,7 +166,7 @@ func evalString(expr string) (string, returnCode, *TclError) {
 		} else if octal > 0 {
 			v := octCharToByte(c)
 			if v == -1 {
-				return "", returnError, NewTclError(EINVALNUM, "invalid octal character in "+expr)
+				return "", NumberSyntaxInvalid
 			}
 			num = num<<3 + v
 			octal--
@@ -196,5 +196,5 @@ func evalString(expr string) (string, returnCode, *TclError) {
 			buf.WriteRune(c)
 		}
 	}
-	return buf.String(), returnOk, nil
+	return buf.String(), nil
 }

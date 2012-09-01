@@ -7,7 +7,6 @@
 package swatcl
 
 import (
-	"fmt"
 	"io"
 	"os"
 )
@@ -17,23 +16,12 @@ type callFrame struct {
 	vars map[string]string
 }
 
-// returnCode is used by commands to indicate their exit status.
-type returnCode int
-
-const (
-	returnOk       returnCode = iota // return code TCL_OK
-	returnError                      // return code TCL_ERROR
-	returnReturn                     // return code TCL_RETURN
-	returnBreak                      // return code TCL_BREAK
-	returnContinue                   // return code TCL_CONTINUE
-)
-
-// commandFunc is a function that implements a built-in command. The
-// argv parameter provides the incoming arguments, with the first entry
-// being the name of the command being invoked. The data parameter is
-// that which was passed to the RegisterCommand method of Interpreter.
-// The function returns the result of the command and any error.
-type commandFunc func(i Interpreter, argv []string, data []string) (string, returnCode, *TclError)
+// commandFunc is a function that implements a built-in command. The argv
+// parameter provides the incoming arguments, with the first entry being the
+// name of the command being invoked. The data parameter is that which was
+// passed to the RegisterCommand method of Interpreter. The function returns
+// the result of the command.
+type commandFunc func(i Interpreter, argv []string, data []string) TclResult
 
 // swatclCmd represents a built-in command.
 type swatclCmd struct {
@@ -46,19 +34,19 @@ type swatclCmd struct {
 type Interpreter interface {
 	io.Writer
 	// GetVariable retrieves a variable from the current call frame.
-	GetVariable(name string) (string, *TclError)
+	GetVariable(name string) (string, error)
 	// SetVariable sets or updates a variable in the current call frame.
-	SetVariable(name, value string) *TclError
+	SetVariable(name, value string) error
 	// RegisterCommand adds the named command function to the interpreter so
 	// it may be invoked at a later time.
-	RegisterCommand(name string, f commandFunc, privdata []string) *TclError
+	RegisterCommand(name string, f commandFunc, privdata []string) error
 	// InvokeCommand will call the named command, passing the given arguments.
-	InvokeCommand(argv []string) (string, returnCode, *TclError)
+	InvokeCommand(argv []string) TclResult
 	// Evaluate interprets the given Tcl text.
-	Evaluate(tcl string) (string, returnCode, *TclError)
+	Evaluate(tcl string) TclResult
 	// SetOutput changes the default output stream for commands like puts.
 	// Passing a nil value will reset to the interpreter's default stdout.
-	SetOutput(out io.Writer) *TclError
+	SetOutput(out io.Writer) error
 	// addFrame adds an empty call frame to the interpreter.
 	addFrame()
 	// popFrame removes the top-most frame from the stack.
@@ -98,27 +86,24 @@ func (i *interpreter) popFrame() {
 }
 
 // GetVariable retrieves a variable from the current call frame.
-func (i *interpreter) GetVariable(name string) (string, *TclError) {
+func (i *interpreter) GetVariable(name string) (string, error) {
 	last := len(i.frames)
 	if last == 0 {
-		err := fmt.Sprintf("Empty call stack, cannot get '%s'", name)
-		return "", NewTclError(ENOSTACK, err)
+		return "", CallStackEmtpy
 	}
 	frame := i.frames[last-1]
 	v, ok := frame.vars[name]
 	if !ok {
-		err := fmt.Sprintf("Variable '%s' undefined", name)
-		return "", NewTclError(EVARUNDEF, err)
+		return "", VariableUndefined
 	}
 	return v, nil
 }
 
 // SetVariable sets or updates a variable in the current call frame.
-func (i *interpreter) SetVariable(name, value string) *TclError {
+func (i *interpreter) SetVariable(name, value string) error {
 	last := len(i.frames)
 	if last == 0 {
-		err := fmt.Sprintf("Empty call stack, cannot set '%s'", name)
-		return NewTclError(ENOSTACK, err)
+		return CallStackEmtpy
 	}
 	frame := i.frames[last-1]
 	frame.vars[name] = value
@@ -127,11 +112,10 @@ func (i *interpreter) SetVariable(name, value string) *TclError {
 
 // RegisterCommand adds the named command function to the interpreter so
 // it may be invoked at a later time.
-func (i *interpreter) RegisterCommand(name string, f commandFunc, privdata []string) *TclError {
+func (i *interpreter) RegisterCommand(name string, f commandFunc, privdata []string) error {
 	_, ok := i.commands[name]
 	if ok {
-		err := fmt.Sprintf("Command '%s' already defined", name)
-		return NewTclError(ECMDDEF, err)
+		return CommandAlreadyDefined
 	}
 	cmd := swatclCmd{f, privdata}
 	i.commands[name] = cmd
@@ -140,65 +124,62 @@ func (i *interpreter) RegisterCommand(name string, f commandFunc, privdata []str
 
 // InvokeCommand will call the named command, passing the given arguments.
 // The result of the command, as well as any error, are returned.
-func (i *interpreter) InvokeCommand(argv []string) (string, returnCode, *TclError) {
-	if len(argv) < 1 {
-		err := "InvokeCommand called without arguments"
-		return "", returnError, NewTclError(EILLARG, err)
+func (i *interpreter) InvokeCommand(argv []string) TclResult {
+	if len(argv) > 1 {
+		name := argv[0]
+		c, ok := i.commands[name]
+		if !ok {
+			return newTclResultErrorf(ECOMMAND, "No such command '%s'", name)
+		}
+		return c.function(i, argv, c.privdata)
 	}
-	name := argv[0]
-	c, ok := i.commands[name]
-	if !ok {
-		err := fmt.Sprintf("No such command '%s'", name)
-		return "", returnError, NewTclError(ECMDUNDEF, err)
-	}
-	return c.function(i, argv, c.privdata)
+	return newTclResultOk("")
 }
 
 // Evaluate interprets the given Tcl text.
-func (i *interpreter) Evaluate(tcl string) (string, returnCode, *TclError) {
+func (i *interpreter) Evaluate(tcl string) TclResult {
 	// command and arguments to be invoked
 	argv := make([]string, 0)
 	c := lex("Evaluate", tcl)
 
 	// TODO: handle escaped newline at end of string (inside both " and {, converts to space)
 	inquotes := false
-	result := ""
-	var code returnCode
-	var err *TclError
+	var result TclResult
+	var err error
 	for {
 		token, ok := <-c
 		if !ok {
-			return "", returnError, NewTclError(ELEXER, "unexpected end of lexer stream")
+			return newTclResultError(ESYNTAX, "unexpected end of lexer stream")
 		}
-		result := token.contents()
+		text := token.contents()
 		switch token.typ {
 		case tokenError:
-			return "", returnError, NewTclError(ELEXER, token.val)
+			return newTclResultError(ESYNTAX, token.val)
 		case tokenEOL, tokenEOF:
 			if len(argv) > 0 {
 				// Parsing complete, invoke the command.
-				result, code, err = i.InvokeCommand(argv)
-				if err != nil {
-					return result, code, err
-				} else if token.typ == tokenEOF {
-					return result, code, nil
+				result = i.InvokeCommand(argv)
+				if !result.Ok() || token.typ == tokenEOF {
+					return result
 				}
+				text = result.Result()
 				argv = make([]string, 0)
 			}
 
 		case tokenVariable:
 			// Get variable value
-			result, err = i.GetVariable(result)
+			text, err = i.GetVariable(text)
 			if err != nil {
-				return "", returnError, err
+				return newTclResultError(EVARIABLE, err.Error())
 			}
 
 		case tokenCommand:
 			// Evaluate command invocation
-			result, code, err = i.Evaluate(result)
-			if err != nil {
-				return "", code, err
+			result = i.Evaluate(text)
+			if !result.Ok() {
+				return result
 			}
+			text = result.Result()
 
 		case tokenQuote:
 			qb, qe := token.quotes()
@@ -210,12 +191,12 @@ func (i *interpreter) Evaluate(tcl string) (string, returnCode, *TclError) {
 		// We have a new token, append to the previous or as new arg?
 		if inquotes {
 			last := len(argv) - 1
-			argv[last] = argv[last] + result
+			argv[last] = argv[last] + text
 		} else {
-			argv = append(argv, result)
+			argv = append(argv, text)
 		}
 	}
-	return result, returnOk, nil
+	return result
 }
 
 // Write writes the given bytes to the standard output for this interpreter.
@@ -224,7 +205,7 @@ func (i *interpreter) Write(p []byte) (n int, err error) {
 }
 
 // SetOutput makes the given writer be the output for this interpreter.
-func (i *interpreter) SetOutput(out io.Writer) *TclError {
+func (i *interpreter) SetOutput(out io.Writer) error {
 	if _, ok := out.(io.Writer); ok {
 		i.stdout = out
 	} else {
@@ -241,10 +222,4 @@ func registerCoreCommands(i Interpreter) {
 	i.RegisterCommand("if", commandIf, nil)
 	i.RegisterCommand("puts", commandPuts, nil)
 	i.RegisterCommand("set", commandSet, nil)
-}
-
-// arityError is a convenience method for commands to report an error
-// with the number of arguments given to the command.
-func arityError(name string) *TclError {
-	return NewTclError(ECOMMAND, "Wrong number of arguments for "+name)
 }

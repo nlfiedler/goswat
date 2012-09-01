@@ -14,7 +14,7 @@ import (
 // compares the result to the corresponding map value.
 func evalStrAndCompare(values map[string]string, t *testing.T) {
 	for k, v := range values {
-		r, _, e := evalString(k)
+		r, e := evalString(k)
 		if e != nil {
 			t.Errorf("evaluation of '%s' failed: %s", k, e)
 		}
@@ -28,7 +28,7 @@ func TestEvalBoolean(t *testing.T) {
 	badbools := [...]string{"foo", "1.0", "sure", "yesarooney", "no, sir"}
 	for bad := range badbools {
 		_, err := evalBoolean(badbools[bad])
-		if err == nil || err.Errno != EBADBOOL {
+		if err != BooleanInvalidSyntax {
 			t.Error("expected bad boolean error")
 		}
 	}
@@ -75,7 +75,7 @@ func TestCoerceNumber(t *testing.T) {
 	ints["+123"] = 123
 	ints["-123"] = -123
 	for k, v := range ints {
-		n, _, err := coerceNumber(k)
+		n, err := coerceNumber(k)
 		if err != nil {
 			t.Errorf("unexpected error in coerceNumber: %s", err)
 		}
@@ -91,7 +91,7 @@ func TestCoerceNumber(t *testing.T) {
 	floats["+123.1"] = 123.1
 	floats["-123.1"] = -123.1
 	for k, v := range floats {
-		n, _, err := coerceNumber(k)
+		n, err := coerceNumber(k)
 		if err != nil {
 			t.Errorf("unexpected error in coerceNumber: %s", err)
 		}
@@ -103,7 +103,7 @@ func TestCoerceNumber(t *testing.T) {
 	strings := [...]string{"a.10", "!@#$", "foo"}
 	for i := range strings {
 		s := strings[i]
-		n, _, err := coerceNumber(s)
+		n, err := coerceNumber(s)
 		if err != nil {
 			t.Errorf("unexpected error in coerceNumber: %s", err)
 		}

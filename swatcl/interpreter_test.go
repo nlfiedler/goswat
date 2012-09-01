@@ -22,10 +22,7 @@ func TestInterpRegisterCommand(t *testing.T) {
 		t.Error("failed to register command foo")
 	}
 	err = interp.RegisterCommand("foo", nil, nil)
-	if err == nil {
-		t.Error("should have failed to register command foo second time")
-	}
-	if err.Errno != ECMDDEF {
+	if err != CommandAlreadyDefined {
 		t.Error("expected command already defined error")
 	}
 }
@@ -38,7 +35,7 @@ func TestInterpGetVariableNoStack(t *testing.T) {
 	interp := NewInterpreter()
 	interp.popFrame()
 	_, err := interp.GetVariable("foo")
-	if err.Errno != ENOSTACK {
+	if err != CallStackEmtpy {
 		t.Error("expected no stack error")
 	}
 }
@@ -47,7 +44,7 @@ func TestInterpSetVariableNoStack(t *testing.T) {
 	interp := NewInterpreter()
 	interp.popFrame()
 	err := interp.SetVariable("foo", "bar")
-	if err == nil || err.Errno != ENOSTACK {
+	if err != CallStackEmtpy {
 		t.Error("expected no stack error in SetVariable")
 	}
 }
@@ -55,7 +52,7 @@ func TestInterpSetVariableNoStack(t *testing.T) {
 func TestInterpUndefVariable(t *testing.T) {
 	interp := NewInterpreter()
 	_, err := interp.GetVariable("foo")
-	if err == nil || err.Errno != EVARUNDEF {
+	if err != VariableUndefined {
 		t.Error("should have failed to get undefined variable")
 	}
 }
@@ -123,10 +120,10 @@ func TestInterpSetGetFrames(t *testing.T) {
 var testCmdCalled bool
 var testCmdArgs string
 
-func testCmd(context Interpreter, argv []string, data []string) (string, returnCode, *TclError) {
+func testCmd(context Interpreter, argv []string, data []string) TclResult {
 	testCmdCalled = true
 	testCmdArgs = strings.Join(argv[1:], ",")
-	return "cmd", returnOk, nil
+	return newTclResultOk("cmd")
 }
 
 func TestInterpInvokeCommand(t *testing.T) {
@@ -140,8 +137,8 @@ func TestInterpInvokeCommand(t *testing.T) {
 	args = append(args, "a")
 	args = append(args, "b")
 	args = append(args, "c")
-	result, _, err := interp.InvokeCommand(args)
-	if err != nil {
+	result := interp.InvokeCommand(args)
+	if !result.Ok() {
 		t.Error("failed to invoke command foo")
 	}
 	if !testCmdCalled {
@@ -150,7 +147,7 @@ func TestInterpInvokeCommand(t *testing.T) {
 	if testCmdArgs != "a,b,c" {
 		t.Error("testCmd did not receive expected arguments")
 	}
-	if result != "cmd" {
+	if result.Result() != "cmd" {
 		t.Error("testCmd failed to affect result of interpreter")
 	}
 }
@@ -161,11 +158,11 @@ func TestInterpInvokeCommand(t *testing.T) {
 
 func TestInterpEvaluateCommand(t *testing.T) {
 	interp := NewInterpreter()
-	result, _, err := interp.Evaluate("set foo bar")
-	if err != nil {
+	result := interp.Evaluate("set foo bar")
+	if !result.Ok() {
 		t.Error("failed to invoke command set")
 	}
-	if result != "bar" {
+	if result.Result() != "bar" {
 		t.Error("set failed to affect result of interpreter")
 	}
 	val, err := interp.GetVariable("foo")
@@ -183,11 +180,11 @@ func TestInterpEvaluateVariable(t *testing.T) {
 	if err != nil {
 		t.Error("failed to set variable")
 	}
-	result, _, err := interp.Evaluate("set $foo quux")
-	if err != nil {
-		t.Errorf("failed to reference variable: %s", err)
+	result := interp.Evaluate("set $foo quux")
+	if !result.Ok() {
+		t.Errorf("failed to reference variable: %s", result.Error())
 	}
-	if result != "quux" {
+	if result.Result() != "quux" {
 		t.Error("var ref failed to affect result of interpreter")
 	}
 	val, err := interp.GetVariable("bar")
