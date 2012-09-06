@@ -7,6 +7,7 @@
 package swatcl
 
 import (
+	"math"
 	"testing"
 )
 
@@ -146,6 +147,28 @@ func TestFunctionPow(t *testing.T) {
 	evaluateAndCompare(i, values, t)
 }
 
+func TestFunctionRound(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["round(0)"] = "0"
+	values["round(1.0)"] = "1"
+	values["round(1.5)"] = "2"
+	values["round(1.9)"] = "2"
+	values["round(1.1)"] = "1"
+	values["round(-1.0)"] = "-1"
+	values["round(-1.5)"] = "-2"
+	values["round(-1.9)"] = "-2"
+	values["round(-1.1)"] = "-1"
+	values["round(2.1)"] = "2"
+	values["round(2.5)"] = "2"
+	values["round(2.9)"] = "3"
+	values["round(-2.1)"] = "-2"
+	values["round(-2.5)"] = "-2"
+	values["round(-2.9)"] = "-3"
+	// TODO: add tests for Inf/-Inf/NaN cases
+	evaluateAndCompare(i, values, t)
+}
+
 func TestFunctionSqrt(t *testing.T) {
 	i := NewInterpreter()
 	values := make(map[string]string)
@@ -181,6 +204,7 @@ func TestFunctionErrors(t *testing.T) {
 	values["floor(1, 2)"] = "takes exactly one argument"
 	values["log(1, 2)"] = "takes exactly one argument"
 	values["log10(1, 2)"] = "takes exactly one argument"
+	values["round(1, 2)"] = "takes exactly one argument"
 	values["sqrt(1, 2)"] = "takes exactly one argument"
 	values["srand(1, 2)"] = "takes exactly one argument"
 	values["abs({a})"] = "takes only ints and floats"
@@ -193,7 +217,48 @@ func TestFunctionErrors(t *testing.T) {
 	values["log10({a})"] = "takes only ints and floats"
 	values["max({a}, {b})"] = "takes only ints and floats"
 	values["min({a}, {b})"] = "takes only ints and floats"
+	values["round({a})"] = "takes only ints and floats"
 	values["sqrt({a})"] = "takes only ints and floats"
 	values["srand({a})"] = "takes only integers"
 	evaluateForError(i, values, t)
+}
+
+func TestMathRound(t *testing.T) {
+	input := make(map[float64]int64)
+	input[1.0] = 1
+	input[1.5] = 2
+	input[1.9] = 2
+	input[1.1] = 1
+	input[-1.0] = -1
+	input[-1.5] = -2
+	input[-1.9] = -2
+	input[-1.1] = -1
+	input[2.1] = 2
+	input[2.5] = 2
+	input[2.9] = 3
+	input[-2.1] = -2
+	input[-2.5] = -2
+	input[-2.9] = -3
+	for k, v := range input {
+		result, err := mathRound(k)
+		if err != nil {
+			t.Errorf("mathRound() unexpectedly failed: %v", err)
+		}
+		if result != v {
+			t.Errorf("mathRound(%f) != %d, got %d", k, v, result)
+		}
+	}
+}
+
+func TestMathRoundBad(t *testing.T) {
+	input := make([]float64, 0)
+	input = append(input, math.Inf(-1))
+	input = append(input, math.Inf(1))
+	input = append(input, math.NaN())
+	for _, val := range input {
+		_, err := mathRound(val)
+		if err == nil {
+			t.Errorf("expected %f to cause an error", val)
+		}
+	}
 }

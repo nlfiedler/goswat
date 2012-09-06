@@ -56,6 +56,7 @@ func populateFunctionTable() {
 	functionTable["min"] = tclMin
 	functionTable["pow"] = tclPow
 	functionTable["rand"] = tclRand
+	functionTable["round"] = tclRound
 	functionTable["sqrt"] = tclSqrt
 	functionTable["srand"] = tclSrand
 }
@@ -412,6 +413,54 @@ func tclRand(args []interface{}) TclResult {
 	return newOperatorResult(rand.Float64())
 }
 
+// mathRound rounds the given floating point number to the nearest integer,
+// rounding to even if the fractional part is equal to .5, as required by
+// Scheme R5RS (also happens to be the IEEE 754 recommended default).
+func mathRound(num float64) (int64, error) {
+	in, fr := math.Modf(num)
+	if math.IsNaN(fr) {
+		return 0, NumberOutOfRange
+	}
+	fr = math.Abs(fr)
+	ini := int64(in)
+	if fr < 0.5 {
+		return ini, nil
+	}
+	if fr > 0.5 {
+		if ini > 0 {
+			return ini + 1, nil
+		}
+		return ini - 1, nil
+	}
+	if ini&1 == 0 {
+		return ini, nil
+	}
+	if ini > 0 {
+		return ini + 1, nil
+	}
+	return ini - 1, nil
+}
+
+// tclRound implements the tcl::mathfunc::round command.
+func tclRound(args []interface{}) TclResult {
+	if len(args) != 1 {
+		return newTclResultError(EARGUMENT, "round() takes exactly one argument")
+	}
+	fl, flok := args[0].(float64)
+	if flok {
+		result, err := mathRound(fl)
+		if err != nil {
+			return newTclResultError(EARGUMENT, err.Error())
+		}
+		return newOperatorResult(result)
+	}
+	in, inok := args[0].(int64)
+	if inok {
+		return newOperatorResult(in)
+	}
+	return newTclResultError(EARGUMENT, "round() takes only ints and floats")
+}
+
 // tclSqrt implements the tcl::mathfunc::sqrt command.
 func tclSqrt(args []interface{}) TclResult {
 	if len(args) != 1 {
@@ -440,22 +489,6 @@ func tclSrand(args []interface{}) TclResult {
 	}
 	return newTclResultError(EARGUMENT, "srand() takes only integers")
 }
-
-// TODO // tclRound implements the tcl::mathfunc::round command.
-// func tclRound(args []interface{}) TclResult {
-// 	if len(args) != 1 {
-// 		return newTclResultError(EARGUMENT, "round() takes exactly one argument")
-// 	}
-// 	fl, flok := args[0].(float64)
-// 	if flok {
-// 		return math.Round(fl), nil
-// 	}
-// 	in, inok := args[0].(int64)
-// 	if inok {
-// 		return in, nil
-// 	}
-// 	return newTclResultError(EARGUMENT, "round() takes only ints and floats")
-// }
 
 // TODO: support following math functions
 // acos, asin, atan, atan2, cos, cosh, entier, hypot, int
