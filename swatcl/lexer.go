@@ -129,8 +129,10 @@ type lexer struct {
 // returns the next state.
 type stateFn func(*lexer) stateFn
 
-// lex initializes the lexer to lex the given Tcl command text,
-// returning the channel from which tokens are received.
+// lex initializes the lexer to lex the given Tcl command text, returning the
+// channel from which tokens are received. Callers should follow this with a
+// defer drainLexer(chan token) to ensure the channel is drained and the goroutine
+// emitting tokens can exit.
 func lex(name, input string) chan token {
 	l := &lexer{
 		name:   name,
@@ -142,8 +144,17 @@ func lex(name, input string) chan token {
 	return l.tokens
 }
 
-// lexExpr initializes the lexer to lex the given Tcl expression,
-// returning the channel from which tokens are received.
+// drainLexer reads from the lexer channel until nothing is left, allowing the
+// goroutine feeding the channel to exit normally.
+func drainLexer(ch chan token) {
+	for _ = range ch {
+	}
+}
+
+// lexExpr initializes the lexer to lex the given Tcl expression, returning
+// the channel from which tokens are received. Callers should follow this with
+// a defer drainLexer(chan token) to ensure the channel is drained and the
+// goroutine emitting tokens can exit.
 func lexExpr(name, input string) chan token {
 	l := &lexer{
 		name:   name,
@@ -221,7 +232,7 @@ func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 		tokenError,
 		fmt.Sprintf(format, args...),
 	}
-	return l.state
+	return nil
 }
 
 // lexStart reads the next token from the input and determines

@@ -141,6 +141,7 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 	// command and arguments to be invoked
 	argv := make([]string, 0)
 	c := lex("Evaluate", tcl)
+	defer drainLexer(c)
 
 	// TODO: handle escaped newline at end of string (inside both " and {, converts to space)
 	inquotes := false

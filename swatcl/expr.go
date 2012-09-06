@@ -358,6 +358,7 @@ func (e *evaluator) Evaluate(expr string) TclResult {
 	e.root = nil
 	// lex the input expression into tokens
 	c := lexExpr("Evaluate", expr)
+	defer drainLexer(c)
 
 	// pull tokens from lexer, building the expression tree
 	for tok := range c {

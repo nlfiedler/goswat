@@ -31,6 +31,7 @@ func coerceNumber(expr string) (interface{}, error) {
 		pe = expr[1:]
 	}
 	c := lexExpr("coerceNumber", pe)
+	defer drainLexer(c)
 	token := <-c
 	if token.typ == tokenFloat {
 		return atof(expr)

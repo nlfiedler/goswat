@@ -23,18 +23,12 @@ type expectedLexerError struct {
 	msg string // explanation of error condition
 }
 
-// drainLexerChannel reads from the given channel until it closes.
-func drainLexerChannel(c chan token) {
-	for _ = range c {
-		// loop until channel is closed
-	}
-}
-
 // verifyLexerResults calls lex() and checks that the resulting tokens
 // match the expected results.
 func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResult) {
 	c := lex("unit", input)
 	verifyLexerResults0(t, c, expected)
+	drainLexer(c)
 }
 
 // verifyLexerExprResults calls lexExpr() and checks that the resulting
@@ -42,6 +36,7 @@ func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResu
 func verifyLexerExprResults(t *testing.T, input string, expected []expectedLexerResult) {
 	c := lexExpr("unit", input)
 	verifyLexerResults0(t, c, expected)
+	drainLexer(c)
 }
 
 // verifyLexerResults0 takes the output of lex() and lexExpr() and
@@ -59,7 +54,6 @@ func verifyLexerResults0(t *testing.T, c chan token, expected []expectedLexerRes
 			t.Errorf("expected '%s', got '%s' (token %d, type %d)", e.val, token.val, i, e.typ)
 		}
 	}
-	drainLexerChannel(c)
 }
 
 // verifyLexerErrors calls lex() and checks that the resulting tokens
@@ -77,7 +71,7 @@ func verifyLexerErrors(t *testing.T, input map[string]expectedLexerError) {
 		if !strings.Contains(tok.val, e.err) {
 			t.Errorf("expected '%s' but got '%s'(%d) for input '%s'", e.err, tok.val, tok.typ, i)
 		}
-		drainLexerChannel(c)
+		drainLexer(c)
 	}
 }
 
@@ -402,5 +396,5 @@ func TestLexerTokenConents(t *testing.T) {
 			t.Errorf("expected '%s', got '%s' (token %d, type %d)", e.val, txt, i, e.typ)
 		}
 	}
-	drainLexerChannel(c)
+	drainLexer(c)
 }
