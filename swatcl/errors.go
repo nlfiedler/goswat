@@ -155,7 +155,7 @@ func (r *tclResult) ReturnCode() returnCode {
 	return returnError
 }
 
-// String returns a human readable for of the result.
+// String returns a human readable form of the result.
 func (r *tclResult) String() string {
 	if r != nil {
 		if r.Ok() {
