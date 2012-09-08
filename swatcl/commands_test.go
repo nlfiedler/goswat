@@ -13,6 +13,56 @@ import (
 )
 
 //
+// commandBreak
+//
+
+func TestCommandBreak(t *testing.T) {
+	interp := NewInterpreter()
+	result := interp.Evaluate("break foo bar")
+	if result.Ok() {
+		t.Error("'break foo bar' is okay?")
+	}
+	result = interp.Evaluate("break")
+	if !result.Ok() {
+		t.Error("'break' not okay?")
+	}
+	if result.ErrorMessage() != "" {
+		t.Error("'break' yielded error message")
+	}
+	if result.Result() != "" {
+		t.Errorf("'break' yielded wrong result: %s", result.Result())
+	}
+	if result.ReturnCode() != returnBreak {
+		t.Errorf("'break' yielded wrong code: %v", result.ReturnCode())
+	}
+}
+
+//
+// commandContinue
+//
+
+func TestCommandContinue(t *testing.T) {
+	interp := NewInterpreter()
+	result := interp.Evaluate("continue foo bar")
+	if result.Ok() {
+		t.Error("'continue foo bar' is okay?")
+	}
+	result = interp.Evaluate("continue")
+	if !result.Ok() {
+		t.Error("'continue' not okay?")
+	}
+	if result.ErrorMessage() != "" {
+		t.Error("'continue' yielded error message")
+	}
+	if result.Result() != "" {
+		t.Errorf("'continue' yielded wrong result: %s", result.Result())
+	}
+	if result.ReturnCode() != returnContinue {
+		t.Errorf("'continue' yielded wrong code: %v", result.ReturnCode())
+	}
+}
+
+//
 // commandExpr
 //
 
@@ -84,6 +134,86 @@ func TestCommandPuts(t *testing.T) {
 	}
 	if out.String() != "one two three" {
 		t.Errorf("expected puts to print its input; got '%s'", result)
+	}
+}
+
+//
+// commandReturn
+//
+
+func TestCommandReturn(t *testing.T) {
+	interp := NewInterpreter()
+	result := interp.Evaluate("return")
+	if !result.Ok() {
+		t.Error("'return' not okay?")
+	}
+	if result.ErrorMessage() != "" {
+		t.Error("'return' yielded error message")
+	}
+	if result.Result() != "" {
+		t.Errorf("'return' yielded wrong result: %s", result.Result())
+	}
+	if result.ReturnCode() != returnReturn {
+		t.Errorf("'return' yielded wrong code: %v", result.ReturnCode())
+	}
+}
+
+func TestCommandReturnOk(t *testing.T) {
+	interp := NewInterpreter()
+	input := "return -code ok"
+	result := interp.Evaluate(input)
+	if !result.Ok() {
+		t.Errorf("'%s' not okay?", input)
+	}
+	if result.ErrorMessage() != "" {
+		t.Errorf("'%s' yielded error message: %s", input, result.ErrorMessage())
+	}
+	if result.Result() != "" {
+		t.Errorf("'%s' yielded wrong result: %s", input, result.Result())
+	}
+	if result.ReturnCode() != returnOk {
+		t.Errorf("'%s' yielded wrong code: %v", input, result.ReturnCode())
+	}
+}
+
+func TestCommandReturnError(t *testing.T) {
+	interp := NewInterpreter()
+	input := "return -code fubar"
+	result := interp.Evaluate(input)
+	if result.Ok() {
+		t.Errorf("'%s' is okay?", input)
+	}
+	input = "return -code error"
+	result = interp.Evaluate(input)
+	if result.Ok() {
+		t.Errorf("'%s' is okay?", input)
+	}
+	if result.ErrorMessage() != "" {
+		t.Errorf("'%s' yielded error message: %s", input, result.ErrorMessage())
+	}
+	if result.Result() != "" {
+		t.Errorf("'%s' yielded wrong result: %s", input, result.Result())
+	}
+	if result.ReturnCode() != returnError {
+		t.Errorf("'%s' yielded wrong code: %v", input, result.ReturnCode())
+	}
+}
+
+func TestCommandReturnResult(t *testing.T) {
+	interp := NewInterpreter()
+	input := "return {a b c}"
+	result := interp.Evaluate(input)
+	if !result.Ok() {
+		t.Errorf("'%s' not okay?", input)
+	}
+	if result.ErrorMessage() != "" {
+		t.Errorf("'%s' yielded error message: %s", input, result.ErrorMessage())
+	}
+	if result.Result() != "a b c" {
+		t.Errorf("'%s' yielded wrong result: %s", input, result.Result())
+	}
+	if result.ReturnCode() != returnReturn {
+		t.Errorf("'%s' yielded wrong code: %v", input, result.ReturnCode())
 	}
 }
 

@@ -125,7 +125,7 @@ func (i *interpreter) RegisterCommand(name string, f commandFunc, privdata []str
 // InvokeCommand will call the named command, passing the given arguments.
 // The result of the command, as well as any error, are returned.
 func (i *interpreter) InvokeCommand(argv []string) TclResult {
-	if len(argv) > 1 {
+	if len(argv) > 0 {
 		name := argv[0]
 		c, ok := i.commands[name]
 		if !ok {
@@ -143,7 +143,7 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 	c := lex("Evaluate", tcl)
 	defer drainLexer(c)
 
-	// TODO: handle escaped newline at end of string (inside both " and {, converts to space)
+	// TODO: handle escaped newline at end of string (for both "" and {}, converts to space)
 	inquotes := false
 	var result TclResult
 	var err error
@@ -160,7 +160,7 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 			if len(argv) > 0 {
 				// Parsing complete, invoke the command.
 				result = i.InvokeCommand(argv)
-				if !result.Ok() || token.typ == tokenEOF {
+				if !result.Ok() || !result.ReturnOk() || token.typ == tokenEOF {
 					return result
 				}
 				text = result.Result()
@@ -177,7 +177,7 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 		case tokenCommand:
 			// Evaluate command invocation
 			result = i.Evaluate(text)
-			if !result.Ok() {
+			if !result.Ok() || !result.ReturnOk() {
 				return result
 			}
 			text = result.Result()
@@ -219,8 +219,11 @@ func (i *interpreter) SetOutput(out io.Writer) error {
 // registerCoreCommands registers the built-in commands provided by this
 // package so that they may be used by other Tcl scripts.
 func registerCoreCommands(i Interpreter) {
+	i.RegisterCommand("break", commandBreak, nil)
+	i.RegisterCommand("continue", commandContinue, nil)
 	i.RegisterCommand("expr", commandExpr, nil)
 	i.RegisterCommand("if", commandIf, nil)
 	i.RegisterCommand("puts", commandPuts, nil)
+	i.RegisterCommand("return", commandReturn, nil)
 	i.RegisterCommand("set", commandSet, nil)
 }

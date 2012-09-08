@@ -42,6 +42,8 @@ func (f *functionNode) PushArgument(a interface{}) {
 // functionTable maps Tcl expression functions to implementations.
 var functionTable = make(map[string]func([]interface{}) TclResult)
 
+// populateFunctionTable adds the supported math functions to the table for
+// ease of converting from a string (e.g. "abs") to an implementation.
 func populateFunctionTable() {
 	functionTable["abs"] = tclAbs
 	functionTable["bool"] = tclBool

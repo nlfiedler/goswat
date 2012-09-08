@@ -70,6 +70,9 @@ type TclResult interface {
 	// ReturnCode returns the resulting return code (e.g. TCL_OK).
 	// The values are the same as for the Tcl return codes.
 	ReturnCode() returnCode
+	// ReturnOk returns true if the returnCode is equal to returnOk,
+	// and false otherwise.
+	ReturnOk() bool
 	// String returns a human readable error message.
 	String() string
 }
@@ -153,6 +156,15 @@ func (r *tclResult) ReturnCode() returnCode {
 		return r.rcode
 	}
 	return returnError
+}
+
+// ReturnOk compares the returnCode field to returnOk and returns true if
+// matches, and false otherwise.
+func (r *tclResult) ReturnOk() bool {
+	if r != nil {
+		return r.rcode == returnOk
+	}
+	return false
 }
 
 // String returns a human readable form of the result.

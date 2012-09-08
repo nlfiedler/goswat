@@ -17,6 +17,22 @@ func arityError(name string) TclResult {
 	return newTclResultErrorf(ECOMMAND, "Wrong number of arguments for '%s'", name)
 }
 
+// commandBreak implements the Tcl 'break' command.
+func commandBreak(i Interpreter, argv []string, data []string) TclResult {
+	if len(argv) != 1 {
+		return arityError(argv[0])
+	}
+	return newTclResult(EOK, "", returnBreak, "")
+}
+
+// commandContinue implements the Tcl 'continue' command.
+func commandContinue(i Interpreter, argv []string, data []string) TclResult {
+	if len(argv) != 1 {
+		return arityError(argv[0])
+	}
+	return newTclResult(EOK, "", returnContinue, "")
+}
+
 // commandExpr implements the Tcl 'expr' command.
 func commandExpr(i Interpreter, argv []string, data []string) TclResult {
 	buf := new(bytes.Buffer)
@@ -29,7 +45,7 @@ func commandExpr(i Interpreter, argv []string, data []string) TclResult {
 	return eval.Evaluate(input)
 }
 
-// commandIf implements the Tcl 'if/then/elseif/else' command.
+// commandIf implements the Tcl 'if/then/elseif/else' commands.
 func commandIf(i Interpreter, argv []string, data []string) TclResult {
 	// if expr1 ?then? body1 elseif expr2 ?then? body2 elseif ... ?else? ?bodyN?
 	if len(argv) != 3 && len(argv) != 5 {
@@ -60,17 +76,61 @@ func commandIf(i Interpreter, argv []string, data []string) TclResult {
 
 // commandPuts implements the Tcl 'puts' command (print a string to the console).
 func commandPuts(i Interpreter, argv []string, data []string) TclResult {
-	if len(argv) < 2 {
-		return arityError(argv[0])
+	if len(argv) > 1 {
+		format := "%s\n"
+		argi := 1
+		if argv[1] == "-nonewline" {
+			format = "%s"
+			argi = 2
+		}
+		fmt.Fprintf(i, format, argv[argi])
+		return newTclResultOk(argv[argi])
 	}
-	format := "%s\n"
-	argi := 1
-	if argv[1] == "-nonewline" {
-		format = "%s"
-		argi = 2
+	return newTclResultOk("")
+}
+
+// returnCodes maps the string representation of return codes (e.g. "break")
+// to their numeric values.
+var returnCodes = make(map[string]returnCode)
+
+// populateReturnCodes adds mappings to the returnCodes table.
+func populateReturnCodes() {
+	returnCodes["ok"] = returnOk
+	returnCodes["error"] = returnError
+	returnCodes["return"] = returnReturn
+	returnCodes["break"] = returnBreak
+	returnCodes["continue"] = returnContinue
+}
+
+// commandReturn implements the Tcl command 'return'.
+func commandReturn(i Interpreter, argv []string, data []string) TclResult {
+	if len(returnCodes) == 0 {
+		populateReturnCodes()
 	}
-	fmt.Fprintf(i, format, argv[argi])
-	return newTclResultOk(argv[argi])
+	// TODO: return cmd: support -errorcode, -errorinfo, -level, -options
+	var rcode returnCode = returnReturn
+	var ecode ErrorCode = EOK
+	result := ""
+	if len(argv) > 1 {
+		for ii := 1; ii < len(argv); ii++ {
+			switch argv[ii] {
+			case "-code":
+				ii++
+				var ok bool
+				rcode, ok = returnCodes[argv[ii]]
+				if !ok {
+					return newTclResultErrorf(EARGUMENT,
+						"return: unknown return code: %s", argv[ii])
+				}
+				if rcode == returnError {
+					ecode = ECOMMAND
+				}
+			default:
+				result = argv[ii]
+			}
+		}
+	}
+	return newTclResult(ecode, "", rcode, result)
 }
 
 // commandSet implements the Tcl 'set' command (set a variable value).
@@ -109,14 +169,6 @@ func commandSet(i Interpreter, argv []string, data []string) TclResult {
 //             return PICOL_OK;
 //         }
 //     }
-// }
-
-// TODO: implement break and continue commands
-// int picolCommandRetCodes(struct picolInterp *i, int argc, char **argv, void *pd) {
-//     if (argc != 1) return picolArityErr(i,argv[0]);
-//     if (strcmp(argv[0],"break") == 0) return PICOL_BREAK;
-//     else if (strcmp(argv[0],"continue") == 0) return PICOL_CONTINUE;
-//     return PICOL_OK;
 // }
 
 // int picolCommandCallProc(struct picolInterp *i, int argc, char **argv, void *pd) {
@@ -161,11 +213,4 @@ func commandSet(i Interpreter, argv []string, data []string) TclResult {
 //     procdata[0] = strdup(argv[2]); /* arguments list */
 //     procdata[1] = strdup(argv[3]); /* procedure body */
 //     return picolRegisterCommand(i,argv[1],picolCommandCallProc,procdata);
-// }
-
-// TODO: implemente return command
-// int picolCommandReturn(struct picolInterp *i, int argc, char **argv, void *pd) {
-//     if (argc != 1 && argc != 2) return picolArityErr(i,argv[0]);
-//     picolSetResult(i, (argc == 2) ? argv[1] : "");
-//     return PICOL_RETURN;
 // }
