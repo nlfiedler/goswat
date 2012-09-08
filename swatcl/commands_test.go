@@ -292,3 +292,68 @@ func TestCommandSet1NoFrame(t *testing.T) {
 		t.Error("expected empty stack error")
 	}
 }
+
+//
+// commandWhile
+//
+
+func TestCommandWhile(t *testing.T) {
+	interp := NewInterpreter()
+	input := "while {foo}"
+	result := interp.Evaluate(input)
+	if result.Ok() {
+		t.Error("'while' with one argument is okay?")
+	}
+	if result.ErrorMessage() != "Wrong number of arguments for 'while'" {
+		t.Errorf("'while' yielded wrong error message: %s", result.ErrorMessage())
+	}
+	input = "while {foo} {bar} {baz}"
+	result = interp.Evaluate(input)
+	if result.Ok() {
+		t.Error("'while' with three arguments is okay?")
+	}
+	if result.ErrorMessage() != "Wrong number of arguments for 'while'" {
+		t.Errorf("'while' yielded wrong error message: %s", result.ErrorMessage())
+	}
+	input = "while {[foo]} {[bar]}"
+	result = interp.Evaluate(input)
+	if result.Ok() {
+		t.Error("'while' unknown commands is okay?")
+	}
+	if result.ErrorMessage() != "No such command 'foo'" {
+		t.Errorf("'while' yielded error message: %s", result.ErrorMessage())
+	}
+	input = "while {1} {[bar]}"
+	result = interp.Evaluate(input)
+	if result.Ok() {
+		t.Error("'while' unknown commands is okay?")
+	}
+	if result.ErrorMessage() != "No such command 'bar'" {
+		t.Errorf("'while' yielded error message: %s", result.ErrorMessage())
+	}
+	input = `set x 0
+while {$x < 10} {
+	set x [expr $x + 1]
+}
+`
+	result = interp.Evaluate(input)
+	if !result.Ok() {
+		t.Error("'while x < 10' not okay?")
+	}
+	if result.ErrorMessage() != "" {
+		t.Errorf("'while x < 10' yielded error message: %s", result.ErrorMessage())
+	}
+	if result.Result() != "" {
+		t.Errorf("'while x < 10' yielded wrong result: %s", result.Result())
+	}
+	if result.ReturnCode() != returnOk {
+		t.Errorf("'while x < 10' yielded wrong code: %v", result.ReturnCode())
+	}
+	val, err := interp.GetVariable("x")
+	if err != nil {
+		t.Errorf("failed to get variable x: %s", err)
+	}
+	if val != "10" {
+		t.Errorf("unexpected value '%s' for variable x", val)
+	}
+}

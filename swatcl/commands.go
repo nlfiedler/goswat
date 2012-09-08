@@ -53,6 +53,7 @@ func commandIf(i Interpreter, argv []string, data []string) TclResult {
 	}
 	// TODO: allow optional 'then' keyword
 	eval := newEvaluator(i)
+	// TODO: can this support the math func/op commands directly?
 	result := eval.Evaluate(argv[1])
 	if !result.Ok() {
 		return result
@@ -138,6 +139,7 @@ func commandSet(i Interpreter, argv []string, data []string) TclResult {
 	if len(argv) < 2 {
 		return arityError(argv[0])
 	}
+	// TODO: support array element reference as with array(index)
 	if len(argv) == 3 {
 		err := i.SetVariable(argv[1], argv[2])
 		if err != nil {
@@ -154,22 +156,36 @@ func commandSet(i Interpreter, argv []string, data []string) TclResult {
 	panic("unreachable code")
 }
 
-// TODO: implement while command
-// int picolCommandWhile(struct picolInterp *i, int argc, char **argv, void *pd) {
-//     if (argc != 3) return picolArityErr(i,argv[0]);
-//     while(1) {
-//         int retcode = picolEval(i,argv[1]);
-//         if (retcode != PICOL_OK) return retcode;
-//         if (atoi(i->result)) {
-//             if ((retcode = picolEval(i,argv[2])) == PICOL_CONTINUE) continue;
-//             else if (retcode == PICOL_OK) continue;
-//             else if (retcode == PICOL_BREAK) return PICOL_OK;
-//             else return retcode;
-//         } else {
-//             return PICOL_OK;
-//         }
-//     }
-// }
+// commandWhile implements the Tcl command 'while'.
+func commandWhile(i Interpreter, argv []string, data []string) TclResult {
+	if len(argv) != 3 {
+		return arityError(argv[0])
+	}
+	eval := newEvaluator(i)
+	for {
+		// TODO: can this support the math func/op commands directly?
+		result := eval.Evaluate(argv[1])
+		if !result.Ok() {
+			return result
+		}
+		test, err := evalBoolean(result.Result())
+		if err != nil {
+			return newTclResultError(ESYNTAX, err.Error())
+		}
+		if test {
+			result = i.Evaluate(argv[2])
+			if !result.Ok() {
+				return result
+			}
+			if result.ReturnCode() == returnBreak {
+				break
+			}
+		} else {
+			break
+		}
+	}
+	return newTclResultOk("")
+}
 
 // int picolCommandCallProc(struct picolInterp *i, int argc, char **argv, void *pd) {
 //     char **x=pd, *alist=x[0], *body=x[1], *p=strdup(alist), *tofree;

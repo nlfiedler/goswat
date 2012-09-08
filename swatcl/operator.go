@@ -36,6 +36,8 @@ type operatorNode struct {
 	sentinel   bool     // true if this is a sentinel node (e.g. left parenthesis)
 }
 
+// TODO: expose the math operators in the tcl::mathop namespace as commands.
+
 // newOperatorNode constructs an operator node based on the given attributes.
 func newOperatorNode(eval Evaluator, token token, arity int) OperatorNode {
 	text := token.contents()
@@ -121,7 +123,8 @@ func (o *operatorNode) evaluate() TclResult {
 	if !right.Ok() {
 		return right
 	}
-	rnum, err := coerceNumber(right.Result())
+	// maybe convert the input into a number, if possible
+	rside, err := coerceNumber(right.Result())
 	if err != nil {
 		return newTclResultError(ESYNTAX, err.Error())
 	}
@@ -130,9 +133,9 @@ func (o *operatorNode) evaluate() TclResult {
 			return newTclResultErrorf(EARGUMENT, "%s cannot operate on nil", o.text)
 		}
 		if o.text == "+" {
-			result = operatorUnaryPlus(rnum)
+			result = operatorUnaryPlus(rside)
 		} else if o.text == "-" {
-			result = operatorUnaryMinus(rnum)
+			result = operatorUnaryMinus(rside)
 		} else {
 			return newTclResultErrorf(ECOMMAND, "unsupported unary operator '%s'", o.text)
 		}
@@ -142,7 +145,7 @@ func (o *operatorNode) evaluate() TclResult {
 	if !left.Ok() {
 		return left
 	}
-	lnum, err := coerceNumber(left.Result())
+	lside, err := coerceNumber(left.Result())
 	if err != nil {
 		return newTclResultError(ESYNTAX, err.Error())
 	}
@@ -152,22 +155,24 @@ func (o *operatorNode) evaluate() TclResult {
 	// case "~", "!":
 	// case "**":
 	case "%":
-		result = operatorRemainder(lnum, rnum)
+		result = operatorRemainder(lside, rside)
 	case "*":
-		result = operatorMultiply(lnum, rnum)
+		result = operatorMultiply(lside, rside)
 	case "/":
-		result = operatorDivide(lnum, rnum)
+		result = operatorDivide(lside, rside)
 	case "+":
-		result = operatorBinaryPlus(lnum, rnum)
+		result = operatorBinaryPlus(lside, rside)
 	case "-":
-		result = operatorBinaryMinus(lnum, rnum)
+		result = operatorBinaryMinus(lside, rside)
 	// case "<<", ">>":
-	// case "<", ">", "<=", ">=":
+	// case ">", "<=", ">=":
+	case "<":
+		result = operatorLessThan(lside, rside)
 	// case "in", "ni":
 	case "eq":
-		result = operatorStringEqual(lnum, rnum)
+		result = operatorStringEqual(lside, rside)
 	case "ne":
-		result = operatorStringNotEqual(lnum, rnum)
+		result = operatorStringNotEqual(lside, rside)
 	// case "&":
 	// case "^":
 	// case "|":
@@ -318,4 +323,40 @@ func operatorStringNotEqual(left, right interface{}) TclResult {
 		return newTclResultOk("0")
 	}
 	return newTclResultOk("1")
+}
+
+// operatorLessThan compares the two values and returns true if the left
+// side valude is less than the right side value, and false otherwise.
+func operatorLessThan(left, right interface{}) TclResult {
+	lf, lf_ok := left.(float64)
+	rf, rf_ok := right.(float64)
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if lf_ok && rf_ok {
+		if lf < rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if lf_ok && ri_ok {
+		if lf < float64(ri) {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && rf_ok {
+		if float64(li) < rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && ri_ok {
+		if li < ri {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	}
+	ls := fmt.Sprint(left)
+	rs := fmt.Sprint(right)
+	if ls < rs {
+		return newTclResultOk("1")
+	}
+	return newTclResultOk("0")
 }

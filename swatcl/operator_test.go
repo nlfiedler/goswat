@@ -160,3 +160,19 @@ func TestOperatorStringEquality(t *testing.T) {
 	values["{a} ne {a}"] = "0"
 	evaluateAndCompare(i, values, t)
 }
+
+func TestOperatorLessThan(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 < 1"] = "0"
+	values["4 < 2"] = "0"
+	values["1 < 4"] = "1"
+	values["-5 < 3"] = "1"
+	values["5.0 < -3"] = "0"
+	values["-5.0 < 3"] = "1"
+	values["5.0 < 3.0"] = "0"
+	values["3.0 < 5.0"] = "1"
+	values["{abc} < {def}"] = "1"
+	values["{def} < {abc}"] = "0"
+	evaluateAndCompare(i, values, t)
+}

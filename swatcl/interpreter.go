@@ -9,6 +9,7 @@ package swatcl
 import (
 	"io"
 	"os"
+	"strings"
 )
 
 // callFrame is a frame within the call stack of the Tcl interpreter.
@@ -150,7 +151,7 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 	for {
 		token, ok := <-c
 		if !ok {
-			return newTclResultError(ESYNTAX, "unexpected end of lexer stream")
+			break
 		}
 		text := token.contents()
 		switch token.typ {
@@ -163,7 +164,7 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 				if !result.Ok() || !result.ReturnOk() || token.typ == tokenEOF {
 					return result
 				}
-				text = result.Result()
+				text = ""
 				argv = make([]string, 0)
 			}
 
@@ -189,12 +190,15 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 			}
 		}
 
-		// We have a new token, append to the previous or as new arg?
-		if inquotes {
-			last := len(argv) - 1
-			argv[last] = argv[last] + text
-		} else {
-			argv = append(argv, text)
+		text = strings.TrimSpace(text)
+		if len(text) > 0 {
+			// We have a new token, append to the previous or as new arg?
+			if inquotes {
+				last := len(argv) - 1
+				argv[last] = argv[last] + text
+			} else {
+				argv = append(argv, text)
+			}
 		}
 	}
 	return result
@@ -226,4 +230,5 @@ func registerCoreCommands(i Interpreter) {
 	i.RegisterCommand("puts", commandPuts, nil)
 	i.RegisterCommand("return", commandReturn, nil)
 	i.RegisterCommand("set", commandSet, nil)
+	i.RegisterCommand("while", commandWhile, nil)
 }
