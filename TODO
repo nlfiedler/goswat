@@ -1,8 +1,8 @@
 GoSwat Checklist (-*- text -*-)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Finish the Scheme and Tcl interpreters
-- Utilize one of the following to facilitate a psuedo GUI in the console
+- Get the Scheme and Tcl interpreters working well enough to do real work
+- Utilize one of the following to facilitate a pseudo GUI in the console
   - https://github.com/nsf/termbox
   - https://github.com/jabb/gocurse
   - http://code.google.com/p/goncurses/
@@ -13,7 +13,7 @@ GoSwat Checklist (-*- text -*-)
 - Evaluate the debug packages (dwarf, elf, etc) for re-use
   - dwarf pkg implements 2.0 standard
   - elf pkg appears up-to-date
-  - proc pkg provides basic debugging support
+  - proc pkg (now deleted?) provides basic debugging support
     - breakpoints
     - processes
     - threads
@@ -26,4 +26,14 @@ GoSwat Checklist (-*- text -*-)
   - Variables view area
   - Registers view area
   - Compile Scheme/Tcl to bytecode
-- Set up tags support in Emacs using tago (https://github.com/AlexCombas/Tago)
+- From Steve Yegge's "The Pinocchio Problem" essay:
+>>>>>
+Living software has a command shell, since you need a way to talk to it like a
+grown-up. It has an extension language, since you need a way to help it grow.
+It has an advice system, since you need a way to train and tailor it. It has a
+niche, since it needs users in order to thrive. It has a plug-in architecture,
+so you can dress it up for your party. And it is self-aware to the maximum
+extent possible given the external performance constraints. These features
+must be seamlessly and elegantly integrated, each subsystem implemented with
+the same care and attention to detail as the system as a whole.
+>>>>>
