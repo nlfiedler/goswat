@@ -9,7 +9,15 @@ package swatcl
 import (
 	"io"
 	"os"
-	"strings"
+)
+
+type quoteState int
+
+const (
+	QUOTE_NONE   quoteState = iota // not inside a quoted string
+	QUOTE_START                    // start of quoted string
+	QUOTE_INSIDE                   // inside a quoted string
+	QUOTE_END                      // end of quoted string
 )
 
 // callFrame is a frame within the call stack of the Tcl interpreter.
@@ -145,10 +153,17 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 	defer drainLexer(c)
 
 	// TODO: handle escaped newline at end of string (for both "" and {}, converts to space)
-	inquotes := false
+
+	var inquotes quoteState = QUOTE_NONE
 	var result TclResult
 	var err error
 	for {
+		// Read tokens and assemble the command line, which should
+		// consist of a command name followed by its arguments.
+		// Embedded commands (e.g. [cmd a b c]) will be evaluated
+		// before being appended to the argument list. The end of the
+		// line or end of the file mark the end of the command, at
+		// which point it is invoked.
 		token, ok := <-c
 		if !ok {
 			break
@@ -164,9 +179,9 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 				if !result.Ok() || !result.ReturnOk() || token.typ == tokenEOF {
 					return result
 				}
-				text = ""
 				argv = make([]string, 0)
 			}
+			continue
 
 		case tokenVariable:
 			// Get variable value
@@ -185,20 +200,34 @@ func (i *interpreter) Evaluate(tcl string) TclResult {
 
 		case tokenQuote:
 			qb, qe := token.quotes()
-			if qb != qe {
-				inquotes = !inquotes
+			if qb && !qe {
+				inquotes = QUOTE_START
+			} else if !qb && !qe {
+				inquotes = QUOTE_INSIDE
+			} else if !qb && qe {
+				inquotes = QUOTE_END
 			}
+			// Else the quoted string is present in its entirety
+			// and does not need any special treatment.
 		}
 
-		text = strings.TrimSpace(text)
 		if len(text) > 0 {
-			// We have a new token, append to the previous or as new arg?
-			if inquotes {
+			if inquotes == QUOTE_INSIDE || inquotes == QUOTE_END {
+				// When inside a quoted string, append the
+				// latest text (e.g. variable value, nested
+				// command, string) to the quoted string.
 				last := len(argv) - 1
 				argv[last] = argv[last] + text
 			} else {
 				argv = append(argv, text)
 			}
+		}
+		if inquotes == QUOTE_START {
+			// Once we are past the start, we are now "inside" the quotes.
+			inquotes = QUOTE_INSIDE
+		} else if inquotes == QUOTE_END {
+			// Reset the quoted string status now that it's complete.
+			inquotes = QUOTE_NONE
 		}
 	}
 	return result
@@ -227,6 +256,7 @@ func registerCoreCommands(i Interpreter) {
 	i.RegisterCommand("continue", commandContinue, nil)
 	i.RegisterCommand("expr", commandExpr, nil)
 	i.RegisterCommand("if", commandIf, nil)
+	i.RegisterCommand("proc", commandProc, nil)
 	i.RegisterCommand("puts", commandPuts, nil)
 	i.RegisterCommand("return", commandReturn, nil)
 	i.RegisterCommand("set", commandSet, nil)

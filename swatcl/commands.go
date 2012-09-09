@@ -9,12 +9,13 @@ package swatcl
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 // arityError is a convenience method for commands to report an error with the
 // number of arguments given to the command.
 func arityError(name string) TclResult {
-	return newTclResultErrorf(ECOMMAND, "Wrong number of arguments for '%s'", name)
+	return newTclResultErrorf(EARGUMENT, "Wrong number of arguments for '%s'", name)
 }
 
 // commandBreak implements the Tcl 'break' command.
@@ -187,46 +188,37 @@ func commandWhile(i Interpreter, argv []string, data []string) TclResult {
 	return newTclResultOk("")
 }
 
-// int picolCommandCallProc(struct picolInterp *i, int argc, char **argv, void *pd) {
-//     char **x=pd, *alist=x[0], *body=x[1], *p=strdup(alist), *tofree;
-//     struct picolCallFrame *cf = malloc(sizeof(*cf));
-//     int arity = 0, done = 0, errcode = PICOL_OK;
-//     char errbuf[1024];
-//     cf->vars = NULL;
-//     cf->parent = i->callframe;
-//     i->callframe = cf;
-//     tofree = p;
-//     while(1) {
-//         char *start = p;
-//         while(*p != ' ' && *p != '\0') p++;
-//         if (*p != '\0' && p == start) {
-//             p++; continue;
-//         }
-//         if (p == start) break;
-//         if (*p == '\0') done=1; else *p = '\0';
-//         if (++arity > argc-1) goto arityerr;
-//         picolSetVar(i,start,argv[arity]);
-//         p++;
-//         if (done) break;
-//     }
-//     free(tofree);
-//     if (arity != argc-1) goto arityerr;
-//     errcode = picolEval(i,body);
-//     if (errcode == PICOL_RETURN) errcode = PICOL_OK;
-//     picolDropCallFrame(i); /* remove the called proc callframe */
-//     return errcode;
-// arityerr:
-//     snprintf(errbuf,1024,"Proc '%s' called with wrong arg num",argv[0]);
-//     picolSetResult(i,errbuf);
-//     picolDropCallFrame(i); /* remove the called proc callframe */
-//     return PICOL_ERR;
-// }
+// invokeProcedure calls the previously registered user-defined procedure and
+// returns the results. It adds a new stack frame to the interpter, sets
+// variables using the names defined as the argument list, evaluates the
+// procedure body, and then removes the stack frame.
+func invokeProcedure(i Interpreter, argv []string, data []string) TclResult {
+	if len(data) != 2 {
+		return newTclResultErrorf(EARGUMENT,
+			"registered proc '%s' missing private data", argv[0])
+	}
+	args := strings.Split(data[0], " ")
+	if len(args)+1 != len(argv) {
+		return arityError(argv[0])
+	}
+	i.addFrame()
+	ii := 1
+	for _, name := range args {
+		i.SetVariable(strings.TrimSpace(name), argv[ii])
+		ii++
+	}
+	result := i.Evaluate(data[1])
+	i.popFrame()
+	return result
+}
 
-// TODO: implement proc command
-// int picolCommandProc(struct picolInterp *i, int argc, char **argv, void *pd) {
-//     char **procdata = malloc(sizeof(char*)*2);
-//     if (argc != 4) return picolArityErr(i,argv[0]);
-//     procdata[0] = strdup(argv[2]); /* arguments list */
-//     procdata[1] = strdup(argv[3]); /* procedure body */
-//     return picolRegisterCommand(i,argv[1],picolCommandCallProc,procdata);
-// }
+// commandProc implements the Tcl 'proc' command.
+func commandProc(i Interpreter, argv []string, data []string) TclResult {
+	if len(argv) != 4 {
+		return arityError(argv[0])
+	}
+	privdata := make([]string, 0, 2)
+	privdata = append(privdata, argv[2], argv[3])
+	i.RegisterCommand(argv[1], invokeProcedure, privdata)
+	return newTclResultOk("")
+}

@@ -109,6 +109,42 @@ func TestCommandIf(t *testing.T) {
 }
 
 //
+// commandProc
+//
+
+func TestCommandProc(t *testing.T) {
+	interp := NewInterpreter()
+	input := `proc say_hello`
+	result := interp.Evaluate(input)
+	if result.Ok() {
+		t.Error("proc unary should fail")
+	}
+	if result.ErrorCode() != EARGUMENT {
+		t.Errorf("proc unary wrong error code: %d", result.ErrorCode())
+	}
+	if result.ErrorMessage() != "Wrong number of arguments for 'proc'" {
+		t.Errorf("proc unary wrong error message: %v",
+			result.ErrorMessage())
+	}
+	input = `proc say_hello {name} {
+	return "Hello $name!"
+}
+say_hello "world"
+`
+	result = interp.Evaluate(input)
+	if !result.Ok() {
+		t.Errorf("proc invocation failed: %v", result.ErrorMessage())
+	}
+	if result.Result() != "Hello world!" {
+		t.Errorf("proc invocation gave wrong result: %v", result.Result())
+	}
+	_, err := interp.GetVariable("name")
+	if err != VariableUndefined {
+		t.Error("proc invocation left variable defined")
+	}
+}
+
+//
 // commandPuts
 //
 
