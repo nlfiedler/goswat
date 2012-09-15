@@ -49,31 +49,71 @@ func commandExpr(i Interpreter, argv []string, data []string) TclResult {
 // commandIf implements the Tcl 'if/then/elseif/else' commands.
 func commandIf(i Interpreter, argv []string, data []string) TclResult {
 	// if expr1 ?then? body1 elseif expr2 ?then? body2 elseif ... ?else? ?bodyN?
-	if len(argv) != 3 && len(argv) != 5 {
+	if len(argv) < 3 {
 		return arityError(argv[0])
 	}
-	// TODO: allow optional 'then' keyword
 	eval := newEvaluator(i)
-	// TODO: can this support the math func/op commands directly?
-	result := eval.Evaluate(argv[1])
-	if !result.Ok() {
-		return result
-	}
-	// TODO: support additional elseif/then clauses
-	b, err := evalBoolean(result.Result())
-	if err != nil {
-		return newTclResultError(ESYNTAX, err.Error())
-	}
-	if b {
-		result = i.Evaluate(argv[2])
-	} else if len(argv) == 5 {
-		if argv[3] != "else" {
-			return newTclResultError(ECOMMAND, "missing 'else' keyword prior to last body")
+	// Compress the command arguments into a normal form and ensure
+	// everything is present. Remove any optional 'then' and ensure every
+	// if/elseif has a condition and body, and the 'else' has a body.
+	args := make([]string, 0)
+	args = append(args, argv[1])
+	cmd := strings.Join(argv, " ")
+	malformed := newTclResultErrorf(EARGUMENT, "malformed if command: %v", cmd)
+	index := 2
+	limit := len(argv)
+	for index < limit {
+		switch argv[index] {
+		case "then":
+			index++
+		case "elseif":
+			args = append(args, argv[index])
+			index++
+			if index+1 == limit {
+				// elseif requires at least two more arguments
+				return malformed
+			}
+		case "else":
+			args = append(args, argv[index])
+			index++
 		}
-		// TODO: need to check that second last argument is 'else'
-		result = i.Evaluate(argv[4])
+		if index == limit {
+			return malformed
+		}
+		args = append(args, argv[index])
+		index++
 	}
-	return result
+	// Now that the arguments have been vetted we can march forward with no checking.
+	index = 0
+	limit = len(args)
+	for index < limit {
+		// get expression at 'index' and evaluate it
+		result := eval.Evaluate(args[index])
+		if !result.Ok() {
+			return result
+		}
+		index++
+		b, err := evalBoolean(result.Result())
+		if err != nil {
+			return newTclResultError(ESYNTAX, err.Error())
+		}
+		if b {
+			// condition is true, evaluate body
+			return i.Evaluate(args[index])
+		}
+		// See if there is more, as in elseif or else.
+		index++
+		if index < limit {
+			if args[index] == "elseif" {
+				index++
+				// loop around and handle same as 'if'
+			} else if args[index] == "else" {
+				index++
+				return i.Evaluate(args[index])
+			}
+		}
+	}
+	return malformed
 }
 
 // commandPuts implements the Tcl 'puts' command (print a string to the console).

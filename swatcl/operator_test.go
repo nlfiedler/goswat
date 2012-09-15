@@ -176,3 +176,89 @@ func TestOperatorLessThan(t *testing.T) {
 	values["{def} < {abc}"] = "0"
 	evaluateAndCompare(i, values, t)
 }
+
+func TestOperatorMoreThan(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 > 1"] = "0"
+	values["4 > 2"] = "1"
+	values["1 > 4"] = "0"
+	values["-5 > 3"] = "0"
+	values["5.0 > -3"] = "1"
+	values["-5.0 > 3"] = "0"
+	values["5.0 > 3.0"] = "1"
+	values["3.0 > 5.0"] = "0"
+	values["{abc} > {def}"] = "0"
+	values["{def} > {abc}"] = "1"
+	evaluateAndCompare(i, values, t)
+}
+
+func TestOperatorLessOrEqual(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 <= 1"] = "1"
+	values["4 <= 2"] = "0"
+	values["1 <= 4"] = "1"
+	values["-5 <= 3"] = "1"
+	values["-5 <= -5"] = "1"
+	values["5.0 <= -3"] = "0"
+	values["5.0 <= 5.0"] = "1"
+	values["-5.0 <= 3"] = "1"
+	values["-5.0 <= -5.0"] = "1"
+	values["5.0 <= 3.0"] = "0"
+	values["3.0 <= 5.0"] = "1"
+	values["{abc} <= {def}"] = "1"
+	values["{abc} <= {abc}"] = "1"
+	values["{def} <= {abc}"] = "0"
+	evaluateAndCompare(i, values, t)
+}
+
+func TestOperatorMoreOrEqual(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 >= 1"] = "1"
+	values["4 >= 2"] = "1"
+	values["1 >= 4"] = "0"
+	values["-5 >= 3"] = "0"
+	values["-5 >= -5"] = "1"
+	values["5.0 >= -3"] = "1"
+	values["5.0 >= 5.0"] = "1"
+	values["-5.0 >= 3"] = "0"
+	values["-5.0 >= -5.0"] = "1"
+	values["5.0 >= 3.0"] = "1"
+	values["3.0 >= 5.0"] = "0"
+	values["{abc} >= {def}"] = "0"
+	values["{abc} >= {abc}"] = "1"
+	values["{def} >= {abc}"] = "1"
+	evaluateAndCompare(i, values, t)
+}
+
+func TestOperatorLogicalAnd(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 && 1"] = "1"
+	values["4 && 2"] = "1"
+	values["1 && 0"] = "0"
+	values["-5 && 3"] = "1"
+	values["-0 && -1"] = "0"
+	values["{yes} && {no}"] = "0"
+	values["{true} && {on}"] = "1"
+	values["{off} && {false}"] = "0"
+	evaluateAndCompare(i, values, t)
+}
+
+func TestOperatorLogicalOr(t *testing.T) {
+	i := NewInterpreter()
+	values := make(map[string]string)
+	values["1 || 1"] = "1"
+	values["4 || 2"] = "1"
+	values["1 || 0"] = "1"
+	values["-5 || 3"] = "1"
+	values["-0 || -1"] = "1"
+	values["-0 || -0"] = "0"
+	values["0 || 0"] = "0"
+	values["{yes} || {no}"] = "1"
+	values["{true} || {on}"] = "1"
+	values["{off} || {false}"] = "0"
+	evaluateAndCompare(i, values, t)
+}

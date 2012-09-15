@@ -165,9 +165,14 @@ func (o *operatorNode) evaluate() TclResult {
 	case "-":
 		result = operatorBinaryMinus(lside, rside)
 	// case "<<", ">>":
-	// case ">", "<=", ">=":
 	case "<":
 		result = operatorLessThan(lside, rside)
+	case ">":
+		result = operatorMoreThan(lside, rside)
+	case "<=":
+		result = operatorLessOrEqual(lside, rside)
+	case ">=":
+		result = operatorMoreOrEqual(lside, rside)
 	// case "in", "ni":
 	case "eq":
 		result = operatorStringEqual(lside, rside)
@@ -176,8 +181,10 @@ func (o *operatorNode) evaluate() TclResult {
 	// case "&":
 	// case "^":
 	// case "|":
-	// case "&&":
-	// case "||":
+	case "&&":
+		result = operatorLogicalAnd(left, right)
+	case "||":
+		result = operatorLogicalOr(left, right)
 	// case "?":
 	default:
 		panic(fmt.Sprintf("unknown operator '%s'", o.text))
@@ -325,8 +332,8 @@ func operatorStringNotEqual(left, right interface{}) TclResult {
 	return newTclResultOk("1")
 }
 
-// operatorLessThan compares the two values and returns true if the left
-// side valude is less than the right side value, and false otherwise.
+// operatorLessThan compares the two values and returns "1" if the left
+// side value is less than the right side value, and "0" otherwise.
 func operatorLessThan(left, right interface{}) TclResult {
 	lf, lf_ok := left.(float64)
 	rf, rf_ok := right.(float64)
@@ -356,6 +363,160 @@ func operatorLessThan(left, right interface{}) TclResult {
 	ls := fmt.Sprint(left)
 	rs := fmt.Sprint(right)
 	if ls < rs {
+		return newTclResultOk("1")
+	}
+	return newTclResultOk("0")
+}
+
+// operatorLessOrEqual compares the two values and returns "1" if the left
+// side value is less than or equal to the right side value, and "0"
+// otherwise.
+func operatorLessOrEqual(left, right interface{}) TclResult {
+	lf, lf_ok := left.(float64)
+	rf, rf_ok := right.(float64)
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if lf_ok && rf_ok {
+		if lf <= rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if lf_ok && ri_ok {
+		if lf <= float64(ri) {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && rf_ok {
+		if float64(li) <= rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && ri_ok {
+		if li <= ri {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	}
+	ls := fmt.Sprint(left)
+	rs := fmt.Sprint(right)
+	if ls <= rs {
+		return newTclResultOk("1")
+	}
+	return newTclResultOk("0")
+}
+
+// operatorMoreThan compares the two values and returns "1" if the left
+// side value is more than the right side value, and "0" otherwise.
+func operatorMoreThan(left, right interface{}) TclResult {
+	lf, lf_ok := left.(float64)
+	rf, rf_ok := right.(float64)
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if lf_ok && rf_ok {
+		if lf > rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if lf_ok && ri_ok {
+		if lf > float64(ri) {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && rf_ok {
+		if float64(li) > rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && ri_ok {
+		if li > ri {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	}
+	ls := fmt.Sprint(left)
+	rs := fmt.Sprint(right)
+	if ls > rs {
+		return newTclResultOk("1")
+	}
+	return newTclResultOk("0")
+}
+
+// operatorMoreOrEqual compares the two values and returns "1" if the left
+// side value is more than or equal to the right side value, and "0"
+// otherwise.
+func operatorMoreOrEqual(left, right interface{}) TclResult {
+	lf, lf_ok := left.(float64)
+	rf, rf_ok := right.(float64)
+	li, li_ok := left.(int64)
+	ri, ri_ok := right.(int64)
+	if lf_ok && rf_ok {
+		if lf >= rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if lf_ok && ri_ok {
+		if lf >= float64(ri) {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && rf_ok {
+		if float64(li) >= rf {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	} else if li_ok && ri_ok {
+		if li >= ri {
+			return newTclResultOk("1")
+		}
+		return newTclResultOk("0")
+	}
+	ls := fmt.Sprint(left)
+	rs := fmt.Sprint(right)
+	if ls >= rs {
+		return newTclResultOk("1")
+	}
+	return newTclResultOk("0")
+}
+
+// isTrue determines if the given thing represents a "true" value in Tcl,
+// returning true if that is the case, and false otherwise.
+func isTrue(val interface{}) (bool, error) {
+	if vf, ok := val.(float64); ok {
+		return vf == 0.0, nil
+	}
+	if vi, ok := val.(int64); ok {
+		return vi == 0, nil
+	}
+	return evalBoolean(fmt.Sprint(val))
+}
+
+// operatorLogicalAnd returns "1" if both sides are non-zero, "0" otherwise.
+func operatorLogicalAnd(left, right interface{}) TclResult {
+	bl, err := isTrue(left)
+	if err != nil {
+		return newTclResultError(EARGUMENT, err.Error())
+	}
+	br, err := isTrue(right)
+	if err != nil {
+		return newTclResultError(EARGUMENT, err.Error())
+	}
+	if bl && br {
+		return newTclResultOk("1")
+	}
+	return newTclResultOk("0")
+}
+
+// operatorLogicalAnd returns "1" if either side is non-zero, "0" otherwise.
+func operatorLogicalOr(left, right interface{}) TclResult {
+	bl, err := isTrue(left)
+	if err != nil {
+		return newTclResultError(EARGUMENT, err.Error())
+	}
+	br, err := isTrue(right)
+	if err != nil {
+		return newTclResultError(EARGUMENT, err.Error())
+	}
+	if bl || br {
 		return newTclResultOk("1")
 	}
 	return newTclResultOk("0")

@@ -106,6 +106,53 @@ func TestCommandIf(t *testing.T) {
 	if result.Result() != "baz" {
 		t.Errorf("if result = %s", result)
 	}
+	// test with the else setting the result
+	result = interp.Evaluate(`if {0} {
+    set foo bar
+} elseif {0} then {
+    set foo baz
+} else {
+    set foo quux
+}`)
+	if !result.Ok() {
+		t.Errorf("failed to invoke command if: %s", result)
+	}
+	if result.Result() != "quux" {
+		t.Errorf("if expected 'quux' but got '%s'", result)
+	}
+	// test with the elseif setting the result
+	result = interp.Evaluate(`if {0} {
+    set foo bar
+} elseif {1} then {
+    set foo baz
+} else {
+    set foo quux
+}`)
+	if !result.Ok() {
+		t.Errorf("failed to invoke command if: %s", result)
+	}
+	if result.Result() != "baz" {
+		t.Errorf("if expected 'baz' but got '%s'", result)
+	}
+	// test with missing parts
+	inputs := make([]string, 0)
+	inputs = append(inputs, "if {1} then")
+	inputs = append(inputs, "if {1} else")
+	inputs = append(inputs, "if {1} elseif")
+	inputs = append(inputs, "if {1} {foo} else")
+	inputs = append(inputs, "if {1} {foo} elseif")
+	inputs = append(inputs, "if {1} {foo} elseif {1}")
+	inputs = append(inputs, "if {1} {foo} elseif {1} {foo} else")
+	inputs = append(inputs, "if {1} {foo} elseif {1} {foo} then")
+	for _, input := range inputs {
+		result = interp.Evaluate(input)
+		if result.Ok() {
+			t.Error("malformed if should fail")
+		}
+		if !strings.Contains(result.ErrorMessage(), "malformed if command") {
+			t.Errorf("expected malformed error, got '%v'", result.ErrorMessage())
+		}
+	}
 }
 
 //
