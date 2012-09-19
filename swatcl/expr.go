@@ -23,9 +23,9 @@ package swatcl
 //
 
 import (
-	"code.google.com/p/goswat/container/vector"
 	"errors"
 	"fmt"
+	"github.com/nlfiedler/goswat/container/vector"
 )
 
 // searchState indicates what the expression evaluator is expecting

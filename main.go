@@ -70,11 +70,6 @@ Use ':exit' or Ctrl-c to exit the debugger.`
 // standard input and the results are displayed to standard output.
 func repl() {
 	// the following will work on any system, but it is rather crude
-	// alternatives include:
-	// - exp/terminal -- only works on Linux, but could possibly correct that
-	// - http://code.google.com/p/termbox/
-	// - http://code.google.com/p/goncurses/
-	// - https://github.com/jabb/gocurse
 	stdin := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("(goswat) ")

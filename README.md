@@ -34,6 +34,7 @@ akin to "living" software...
   - [termbox](https://github.com/nsf/termbox)
   - [gocurse](https://github.com/jabb/gocurse)
   - [goncurses](http://code.google.com/p/goncurses/)
+  - (deleted) exp/terminal -- only worked on Linux
 - Evaluate the (now deleted) exp/ogle package to see how it uses debug/elf and debug/dwarf
 - Evaluate the (now deleted?) debug/proc package (breakpoints, processes, threads, registers)
 - Features
