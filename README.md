@@ -27,6 +27,12 @@ akin to "living" software...
 > implemented with the same care and attention to detail as the system
 > as a whole.
 
+## Installation ##
+
+Run the `go` tool like so:
+
+    go get github.com/nlfiedler/goswat
+
 ## TODO ##
 
 - Make the Scheme and Tcl interpreters work well enough for real work
