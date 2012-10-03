@@ -215,3 +215,23 @@ func logSysInfo() {
 	}
 	log.Println(header)
 }
+
+// TODO: use the following to capture interrupt signal (e.g. Ctrl-c)
+// import (
+//     "fmt"
+//     "os"
+//     "os/signal"
+//     "runtime"
+//     "syscall"
+// )
+// func signalCatcher() {
+//     ch := make(chan os.Signal)
+//     signal.Notify(ch, syscall.SIGINT)
+//     <-ch
+//     fmt.Println("CTRL-C; exiting")
+//     os.Exit(0)
+// }
+// func main() {
+//     go signalCatcher()
+//     // Go about doing stuff, avoid tight loops, or ensure GOMAXPROCS is > 1
+// }
