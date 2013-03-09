@@ -416,8 +416,8 @@ func tclRand(args []interface{}) TclResult {
 }
 
 // mathRound rounds the given floating point number to the nearest integer,
-// rounding to even if the fractional part is equal to .5, as required by
-// Scheme R5RS (also happens to be the IEEE 754 recommended default).
+// rounding to even if the fractional part is equal to .5 (the IEEE 754
+// recommended default).
 func mathRound(num float64) (int64, error) {
 	in, fr := math.Modf(num)
 	if math.IsNaN(fr) {
