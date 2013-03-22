@@ -59,7 +59,7 @@ func main() {
 Use ':exit' or Ctrl-c to exit the debugger.`
 	//Startup commands can be placed in ".goswatrc" in ~ or .`
 	fmt.Println(welmsg)
-	// TODO: initialize the liswat and swatcl environments
+	// TODO: initialize the scheme environment
 	// TODO: initialize and set up the curses-based interface
 	// TODO: find and run the RC file, if any
 	// TODO: process the command line arguments, if any
