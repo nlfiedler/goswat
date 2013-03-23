@@ -1,18 +1,19 @@
 ## A non-working, in-progress Go debugger ##
 
-Eventually this will be a debugger for applications written in the Go
-programming language (golang). The debugger itself is written in Go,
-and implements interpreters for both Scheme and Tcl. These are used to
-write the actual debugging functionality, much as Emacs is largely
-implemented in elisp. The inspiration for GoSwat is a debugger for
-PC/GEOS called swat, which started life as the debugger for the Sprite
-operating system. Naturally it was a Tcl interpreting debugger, since
-Sprite and Tcl share a common progenitor.
+Eventually this will be a debugger for applications written in the
+[Go](http://golang.org) programming language (a.k.a. golang). The
+debugger itself will consist of a base written in Go, with much of the
+debugging functionality written in Scheme. The Scheme interpreter will
+be provided by the [bakeneko](https://github.com/nlfiedler/bakeneko)
+project, a Scheme interpreter written in Go.  The inspiration for
+GoSwat is a debugger for PC/GEOS called swat, which started life as
+the debugger for the Sprite operating system. Naturally it was a Tcl
+interpreting debugger, since Sprite and Tcl share a common progenitor.
 
-Presently neither the Scheme nor the Tcl interpreter is complete, nor
-is there any debugging functionality. For the time being, you can
-check out the code. It would be splendid if GoSwat became something
-akin to "living" software...
+Presently neither the Scheme interpreter nor the debugger is anywhere
+near complete. For the time being, you can check out the code. It
+would be splendid if GoSwat became something akin to "living"
+software...
 
 ## From Steve Yegge's [The Pinocchio Problem](http://steve-yegge.blogspot.com/2007/01/pinocchio-problem.html) ##
 
@@ -35,7 +36,7 @@ Run the `go` tool like so:
 
 ## TODO ##
 
-- Make the Scheme and Tcl interpreters work well enough for real work
+- Get bakeneko working well enough for real work
 - Utilize one of the following to facilitate a pseudo GUI in the console:
   - [termbox](https://github.com/nsf/termbox)
   - [gocurse](https://github.com/jabb/gocurse)
@@ -49,4 +50,3 @@ Run the `go` tool like so:
   - Source view area
   - Variables view area
   - Registers view area
-  - Compile Scheme/Tcl to bytecode
