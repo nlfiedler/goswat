@@ -50,3 +50,8 @@ Run the `go` tool like so:
   - Source view area
   - Variables view area
   - Registers view area
+
+## License ##
+
+The goswat project is licensed under the
+[New BSD](http://opensource.org/licenses/BSD-3-Clause) license.
