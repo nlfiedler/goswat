@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -85,13 +85,9 @@ func repl() {
 			} else if input == ":help" {
 				fmt.Println("Use :exit to exit the debugger")
 				fmt.Println("Use :lisp to enter the Lisp interpreter")
-				fmt.Println("Use :tcl to enter the Tcl interpreter")
 			} else if input == ":lisp" {
 				fmt.Println("Entering the Scheme interpreter...")
 				lispRepl()
-			} else if input == ":tcl" {
-				fmt.Println("Entering the Tcl interpreter...")
-				tclRepl()
 			} else {
 				fmt.Println("I did not understand that command, try :help")
 			}
@@ -119,31 +115,6 @@ func lispRepl() {
 			} else {
 				// TODO: pass the input to the Scheme interpreter
 				fmt.Println("I don't really evaluate Lisp just yet")
-			}
-		}
-	}
-}
-
-// tclRepl implements the read-eval-print-loop in which commands are read
-// from standard input, processed by the built-in Tcl interpreter, and the
-// results are displayed to standard output.
-func tclRepl() {
-	stdin := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("(tcl) ")
-		input, err := stdin.ReadString(10)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			input = strings.TrimSpace(input)
-			// process the command
-			if input == ":exit" {
-				return
-			} else if input == ":help" {
-				fmt.Println("Use :exit to exit the Tcl interpreter")
-			} else {
-				// TODO: pass the input to the Tcl interpreter
-				fmt.Println("I don't really evaluate Tcl just yet")
 			}
 		}
 	}
